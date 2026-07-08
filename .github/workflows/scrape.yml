@@ -27,42 +27,53 @@ jobs:
 
     steps:
       # ============================================================
-      # ÉTAPE 1: CHECKOUT OBLIGATOIRE
+      # ÉTAPE 1: CHECKOUT
       # ============================================================
       - name: Récupération du code source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          # NE PAS spécifier 'path' - garder le répertoire par défaut
 
       # ============================================================
-      # ÉTAPE 2: VÉRIFICATION GIT
+      # ÉTAPE 2: VÉRIFICATION ET CORRECTION GIT
       # ============================================================
-      - name: Vérification du dépôt
+      - name: Configuration Git
         run: |
-          echo "📁 Répertoire de travail: $(pwd)"
-          echo ""
-          echo "📋 Contenu du répertoire:"
+          echo "📁 Répertoire: $(pwd)"
+          echo "📋 Contenu:"
           ls -la
-          echo ""
-          echo "🔍 Recherche de .git:"
-          if [ -d ".git" ]; then
-            echo "✅ .git trouvé"
-            echo ""
-            echo "📊 Statut git:"
-            git status
-            echo ""
-            echo "🌿 Branches disponibles:"
-            git branch -a
-          else
-            echo "❌ .git NON TROUVÉ"
-            echo "Tentative d'initialisation..."
+          
+          # Si .git n'existe pas, l'initialiser correctement
+          if [ ! -d ".git" ]; then
+            echo "⚠️ Initialisation de git..."
             git init
             git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+            
+            # Récupérer les branches existantes
+            git fetch origin
+            
+            # Si la branche main existe sur le remote
+            if git ls-remote --heads origin main | grep -q main; then
+              echo "✅ Branche main trouvée sur le remote"
+              git fetch origin main
+              git checkout main || git checkout -b main origin/main
+            else
+              echo "⚠️ Création de la branche main"
+              git checkout -b main
+            fi
+          else
+            echo "✅ .git existe"
             git fetch origin
             git checkout main || git checkout -b main
           fi
+          
+          # Configurer git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          echo "🌿 Branche actuelle: $(git branch --show-current)"
+          git status
 
       # ============================================================
       # ÉTAPE 3: PYTHON
@@ -79,12 +90,9 @@ jobs:
       # ============================================================
       - name: Installation des dépendances
         run: |
-          echo "📦 Installation des dépendances..."
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
-          echo ""
-          echo "✅ Dépendances installées:"
-          pip list | grep -E "cloudscraper|beautifulsoup4|lxml|feedgen|transformers|torch|sentencepiece"
+          echo "✅ Dépendances installées"
 
       # ============================================================
       # ÉTAPE 5: SCRAPING
@@ -123,32 +131,16 @@ jobs:
       # ============================================================
       - name: Commit et push vers main
         run: |
-          echo "📁 Répertoire courant: $(pwd)"
-          
-          # Vérifier si .git existe, sinon l'initialiser
-          if [ ! -d ".git" ]; then
-            echo "⚠️ .git n'existe pas, initialisation..."
-            git init
-            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-            git fetch origin
-            git checkout main || git checkout -b main
-          fi
+          # S'assurer qu'on est dans le bon répertoire
+          cd $GITHUB_WORKSPACE
           
           # Configurer git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Vérifier qu'on est sur main
-          echo "🌿 Branche actuelle:"
-          git branch
-          echo ""
-          
-          # Si on est pas sur main, essayer de checkout
-          CURRENT_BRANCH=$(git branch --show-current)
-          if [ "$CURRENT_BRANCH" != "main" ]; then
-            echo "⚠️ Pas sur main, tentative de checkout..."
-            git checkout main || git checkout -b main
-          fi
+          # Récupérer les dernières modifications du remote
+          echo "🔄 Pull des dernières modifications..."
+          git pull origin main --rebase || true
           
           # Ajouter le fichier
           git add feed.xml
@@ -160,8 +152,17 @@ jobs:
           else
             echo "📝 Changements détectés, commit en cours..."
             git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M')"
-            git push origin main
-            echo "✅ Push effectué avec succès"
+            
+            # Push avec force seulement si nécessaire
+            echo "📤 Push vers main..."
+            if git push origin main; then
+              echo "✅ Push effectué avec succès"
+            else
+              echo "⚠️ Push rejeté, tentative de force..."
+              git pull origin main --rebase
+              git push origin main || git push origin main --force-with-lease
+              echo "✅ Push forcé effectué"
+            fi
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
