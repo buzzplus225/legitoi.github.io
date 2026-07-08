@@ -3,25 +3,16 @@
 # ==============================================================================
 name: RSS Scraper - Legit.ng vers Français
 
-# ==============================================================================
-# DÉCLENCHEURS (Triggers)
-# ==============================================================================
 on:
   schedule:
     - cron: '0 */4 * * *'
   workflow_dispatch:
 
-# ==============================================================================
-# VARIABLES D'ENVIRONNEMENT GLOBALES
-# ==============================================================================
 env:
   PYTHON_VERSION: '3.10'
   PIP_NO_INPUT: 1
   PIP_DEFAULT_TIMEOUT: 100
 
-# ==============================================================================
-# DÉFINITION DES JOBS
-# ==============================================================================
 jobs:
   scrape-and-translate:
     name: Scrape, traduit et publie le flux RSS
@@ -35,98 +26,84 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      # -----------------------------------------------------------------------
-      # Étape 1: Checkout du dépôt (CORRECTION IMPORTANTE)
-      # -----------------------------------------------------------------------
+      # Étape 1: Checkout
       - name: Récupération du code source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          # S'assurer que le checkout est fait dans le bon répertoire
-          path: .
 
-      # DEBUG: Vérifier qu'on est bien dans un dépôt git
-      - name: Vérification du dépôt git
+      # Étape 2: Debug git
+      - name: Vérification du dépôt
         run: |
-          echo "Répertoire courant: $(pwd)"
-          echo "Contenu du répertoire:"
+          echo "📁 Répertoire courant: $(pwd)"
+          echo "📋 Contenu:"
           ls -la
-          echo "Vérification de l'existence de .git:"
+          echo "🔍 Vérification de .git:"
           if [ -d ".git" ]; then
-            echo "✓ .git existe"
+            echo "✅ .git existe"
             git status
+            git branch -a
           else
-            echo "✗ .git n'existe pas !"
+            echo "❌ .git n'existe pas !"
             exit 1
           fi
 
-      # -----------------------------------------------------------------------
-      # Étape 2: Configuration de Python
-      # -----------------------------------------------------------------------
-      - name: Installation de Python ${{ env.PYTHON_VERSION }}
+      # Étape 3: Python
+      - name: Installation de Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
           cache-dependency-path: requirements.txt
 
-      # -----------------------------------------------------------------------
-      # Étape 3: Installation des dépendances
-      # -----------------------------------------------------------------------
+      # Étape 4: Dépendances
       - name: Installation des dépendances
         run: |
+          echo "📦 Installation des dépendances..."
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
-          echo "=== Versions installées ==="
-          pip list | grep -E "cloudscraper|beautifulsoup4|lxml|feedgen|transformers|torch|sentencepiece|protobuf"
+          echo ""
+          echo "✅ Versions installées:"
+          pip list | grep -E "cloudscraper|beautifulsoup4|lxml|feedgen|transformers|torch|sentencepiece|protobuf|dateutil"
 
-      # -----------------------------------------------------------------------
-      # Étape 4: Exécution du scraper
-      # -----------------------------------------------------------------------
-      - name: Exécution du scraper et traduction
+      # Étape 5: Scraping
+      - name: Exécution du scraper
         run: |
-          echo "=== Début du scraping ==="
-          echo "Date: $(date)"
+          echo "🚀 Début du scraping: $(date)"
           python scraper_traducteur.py
-          echo "=== Fin du scraping ==="
+          echo "✅ Fin du scraping: $(date)"
           
           if [ -f "feed.xml" ]; then
-            echo "✓ feed.xml généré avec succès"
-            echo "Taille: $(wc -c < feed.xml) octets"
+            echo "✅ feed.xml généré"
+            echo "📊 Taille: $(wc -c < feed.xml) octets"
+            echo "📝 Nombre de lignes: $(wc -l < feed.xml)"
           else
-            echo "✗ Erreur: feed.xml non créé"
+            echo "❌ feed.xml non créé"
             exit 1
           fi
 
-      # -----------------------------------------------------------------------
-      # Étape 5: Publication sur GitHub Pages
-      # -----------------------------------------------------------------------
+      # Étape 6: GitHub Pages
       - name: Publication sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .
           publish_branch: gh-pages
-          commit_message: "Mise à jour automatique du flux RSS (${{ github.run_id }})"
+          commit_message: "🔄 Mise à jour RSS - ${{ github.run_id }}"
           force_orphan: true
           keep_files: false
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
 
-      # -----------------------------------------------------------------------
-      # Étape 6: Mise à jour sur la branche principale (CORRIGÉE)
-      # -----------------------------------------------------------------------
+      # Étape 7: Commit sur main
       - name: Commit et push vers main
         run: |
-          # S'assurer d'être dans le bon répertoire
           cd $GITHUB_WORKSPACE
           
-          # Vérifier à nouveau qu'on est dans un dépôt git
+          # Vérifier .git
           if [ ! -d ".git" ]; then
-            echo "ERREUR: .git n'existe pas dans $GITHUB_WORKSPACE"
-            echo "Contenu du répertoire:"
-            ls -la
+            echo "❌ .git n'existe pas"
             exit 1
           fi
           
@@ -134,11 +111,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Vérifier la branche actuelle
-          echo "Branche actuelle:"
-          git branch
-          
-          # S'assurer qu'on est sur main
+          # S'assurer d'être sur main
           git checkout main || git checkout -b main
           
           # Ajouter le fichier
@@ -146,30 +119,33 @@ jobs:
           
           # Vérifier les changements
           if git diff --staged --quiet; then
-            echo "Aucun changement détecté dans feed.xml. Push ignoré."
+            echo "✅ Aucun changement détecté"
+            echo "Le flux RSS est déjà à jour"
           else
-            git commit -m "Mise à jour du flux RSS - $(date '+%Y-%m-%d %H:%M')"
+            echo "📝 Changements détectés"
+            git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M')"
             git push origin main
+            echo "✅ Push effectué"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # -----------------------------------------------------------------------
-      # Étape 7: Résumé
-      # -----------------------------------------------------------------------
+      # Étape 8: Résumé
       - name: Résumé de l'exécution
         if: always()
         run: |
-          echo "### Résumé du scraping" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Résumé du scraping" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Date:** $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Statut:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Fichier généré:** feed.xml" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL du flux:** https://buzzplus225.github.io/legitoi.github.io/feed.xml" >> $GITHUB_STEP_SUMMARY
+          echo "| Métrique | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📅 Date | $(date) |" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Statut | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📁 Fichier | feed.xml |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔗 URL | https://buzzplus225.github.io/legitoi.github.io/feed.xml |" >> $GITHUB_STEP_SUMMARY
           
           if [ -f "feed.xml" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Extrait du flux" >> $GITHUB_STEP_SUMMARY
+            echo "### 📝 Extrait du flux" >> $GITHUB_STEP_SUMMARY
             echo '```xml' >> $GITHUB_STEP_SUMMARY
             head -30 feed.xml >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
