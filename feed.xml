@@ -1,22 +1,173 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
   <channel>
-    <title>Legit.ng - Actualités en Français</title>
-    <link>https://www.legit.ng/</link>
-    <description>Flux d'actualités Legit.ng traduit automatiquement en Français</description>
+    <title>Legit.ng - Actualités traduites en français</title>
+    <link>https://buzzplus225.github.io/legitoi.github.io/feed.xml</link>
+    <description>Flux RSS des actualités de Legit.ng automatiquement traduites en français</description>
     <atom:link href="https://buzzplus225.github.io/legitoi.github.io/feed.xml" rel="self"/>
-    <copyright>© 2026 Legit.ng - Traduction Automatique</copyright>
     <docs>http://www.rssboard.org/rss-specification</docs>
-    <generator>python-feedgen</generator>
+    <generator>Scraper Traducteur Legit.ng v2.0</generator>
     <language>fr</language>
-    <lastBuildDate>Wed, 08 Jul 2026 06:10:34 +0000</lastBuildDate>
+    <lastBuildDate>Wed, 08 Jul 2026 07:09:58 +0000</lastBuildDate>
     <item>
       <title>Meilleures écoles de cuisine et de restauration à Lagos et leurs tarifs</title>
       <link>https://www.legit.ng/ask-legit/top/1158528-best-catering-schools-lagos-fees/</link>
       <description>Meilleures écoles de cuisine et de restauration à Lagos et leurs tarifs</description>
-      <content:encoded>&lt;div&gt;&lt;img src="https://cdn.legit.ng/images/190x107/5fc0f6798f76b297.jpeg?v=1" alt="Meilleures écoles de cuisine et de restauration à Lagos et leurs tarifs" style="max-width:100%; height:auto; border-radius:6px; margin-bottom:12px;" /&gt;&lt;br/&gt;&lt;p&gt;&lt;strong&gt;Meilleures écoles de cuisine et de restauration à Lagos et leurs tarifs&lt;/strong&gt;&lt;/p&gt;&lt;p&gt;Meilleures écoles de cuisine et de restauration à Lagos et leurs tarifs&lt;/p&gt;&lt;p&gt;&lt;a href="https://www.legit.ng/ask-legit/top/1158528-best-catering-schools-lagos-fees/" target="_blank" style="color:#1a73e8; text-decoration:none; font-weight:bold;"&gt;Lire l'article original sur Legit.ng ↗&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;</content:encoded>
-      <guid isPermaLink="false">https://www.legit.ng/ask-legit/top/1158528-best-catering-schools-lagos-fees/</guid>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/5fc0f6798f76b297.jpeg?v=1" alt="Best culinary and catering schools in Lagos and their fees" style="max-width:100%;"/><br/><p>Meilleures écoles de cuisine et de restauration à Lagos et leurs tarifs</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/ask-legit/top/1158528-best-catering-schools-lagos-fees/</guid>
       <pubDate>Mon, 06 Jul 2026 13:05:55 +0000</pubDate>
+    </item>
+    <item>
+      <title>Comment entrer dans une école de mode à Lagos : écoles, tarifs et conseils utiles</title>
+      <link>https://www.legit.ng/1209731-how-a-fashion-school-lagos-schools-fees-tips.html</link>
+      <description>Comment entrer dans une école de mode à Lagos : écoles, tarifs et conseils utiles</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/0a651dc60965ce92.jpeg?v=1" alt="How to get into a fashion school in Lagos: schools, fees and useful tips" style="max-width:100%;"/><br/><p>Comment entrer dans une école de mode à Lagos : écoles, tarifs et conseils utiles</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/1209731-how-a-fashion-school-lagos-schools-fees-tips.html</guid>
+      <pubDate>Mon, 06 Jul 2026 11:35:19 +0000</pubDate>
+    </item>
+    <item>
+      <title>Un étudiant de l'Université d'Ibadan qui prévoyait d'obtenir son diplôme avec des sacs 2 : 1 en première classe, partage son histoire</title>
+      <link>https://www.legit.ng/people/1697848-university-ibadan-student-planned-graduate-21-bags-class-shares-story/</link>
+      <description>Un étudiant de l'Université d'Ibadan qui prévoyait d'obtenir son diplôme avec des sacs 2 : 1 en première classe, partage son histoire</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/35199dd0bb401a8d.jpeg?v=1" alt="University of Ibadan student who planned to graduate with 2:1 bags first class, shares story" style="max-width:100%;"/><br/><p>Un étudiant de l'Université d'Ibadan qui prévoyait d'obtenir son diplôme avec des sacs 2 : 1 en première classe, partage son histoire</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/people/1697848-university-ibadan-student-planned-graduate-21-bags-class-shares-story/</guid>
+      <pubDate>Tue, 07 Jul 2026 18:46:19 +0000</pubDate>
+    </item>
+    <item>
+      <title>Les dernières tendances des publications sur les réseaux sociaux de l'influenceuse populaire Arewa Hadiza Mago quelques heures à peine après sa mort</title>
+      <link>https://www.legit.ng/entertainment/celebrities/1717963-popular-arewa-influencer-hadiza-magos-social-media-post-barely-hours-death-trends/</link>
+      <description>Les dernières tendances des publications sur les réseaux sociaux de l'influenceuse populaire Arewa Hadiza Mago quelques heures à peine après sa mort</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/c4dcc6fc534da307.jpeg?v=1" alt="Popular Arewa influencer Hadiza Mago’s last social media post trends barely hours after her death" style="max-width:100%;"/><br/><p>Les dernières tendances des publications sur les réseaux sociaux de l'influenceuse populaire Arewa Hadiza Mago quelques heures à peine après sa mort</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/entertainment/celebrities/1717963-popular-arewa-influencer-hadiza-magos-social-media-post-barely-hours-death-trends/</guid>
+      <pubDate>Tue, 07 Jul 2026 08:56:23 +0000</pubDate>
+    </item>
+    <item>
+      <title>Le créateur de mode disparu Ejiro refait surface et partage son témoignage à l'église de Jerry Eze</title>
+      <link>https://www.legit.ng/entertainment/fashion/1717944-missing-fashion-designer-ejiro-resurfaces-shares-testimony-jerry-ezes-church/</link>
+      <description>Le créateur de mode disparu Ejiro refait surface et partage son témoignage à l'église de Jerry Eze</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/3391008ecd429946.jpeg?v=1" alt="Missing fashion designer Ejiro resurfaces, shares testimony at Jerry Eze's church" style="max-width:100%;"/><br/><p>Le créateur de mode disparu Ejiro refait surface et partage son témoignage à l'église de Jerry Eze</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/entertainment/fashion/1717944-missing-fashion-designer-ejiro-resurfaces-shares-testimony-jerry-ezes-church/</guid>
+      <pubDate>Tue, 07 Jul 2026 09:10:31 +0000</pubDate>
+    </item>
+    <item>
+      <title>La veuve de Kolawole Olawuyi, Abimbola, est décédée 19 ans après la disparition de Nnkan Nbe Broadcaster</title>
+      <link>https://www.legit.ng/entertainment/celebrities/1717977-kolawole-olawuyis-widow-abimbola-passes-19-years-nnkan-nbe-broadcasters-demise/</link>
+      <description>La veuve de Kolawole Olawuyi, Abimbola, est décédée 19 ans après la disparition de Nnkan Nbe Broadcaster</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/fa9255a4dbc8d0aa.jpeg?v=1" alt="Kolawole Olawuyi’s widow, Abimbola, passes away 19 years after Nnkan Nbe Broadcaster's demise" style="max-width:100%;"/><br/><p>La veuve de Kolawole Olawuyi, Abimbola, est décédée 19 ans après la disparition de Nnkan Nbe Broadcaster</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/entertainment/celebrities/1717977-kolawole-olawuyis-widow-abimbola-passes-19-years-nnkan-nbe-broadcasters-demise/</guid>
+      <pubDate>Tue, 07 Jul 2026 10:01:19 +0000</pubDate>
+    </item>
+    <item>
+      <title>Bobrisky fait des aveux surprenants sur son test VIH et laisse les fans parler</title>
+      <link>https://www.legit.ng/entertainment/celebrities/1717998-bobrisky-surprising-confession-hiv-test-leaves-fans-talking/</link>
+      <description>Bobrisky fait des aveux surprenants sur son test VIH et laisse les fans parler</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/375ebf848a613214.jpeg?v=1" alt="Bobrisky makes surprising confession about his HIV test, leaves fans talking" style="max-width:100%;"/><br/><p>Bobrisky fait des aveux surprenants sur son test VIH et laisse les fans parler</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/entertainment/celebrities/1717998-bobrisky-surprising-confession-hiv-test-leaves-fans-talking/</guid>
+      <pubDate>Tue, 07 Jul 2026 11:07:35 +0000</pubDate>
+    </item>
+    <item>
+      <title>La raffinerie de Dangote et les principaux distributeurs réduisent les prix de l'essence après que FG ait fait pression pour réduire les coûts du carburant</title>
+      <link>https://www.legit.ng/business-economy/energy/1717971-dangote-refinery-major-marketers-slash-petrol-prices-fg-push-fuel-costs/</link>
+      <description>La raffinerie de Dangote et les principaux distributeurs réduisent les prix de l'essence après que FG ait fait pression pour réduire les coûts du carburant</description>
+      <content:encoded><![CDATA[<p>La raffinerie de Dangote et les principaux distributeurs réduisent les prix de l'essence après que FG ait fait pression pour réduire les coûts du carburant</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/business-economy/energy/1717971-dangote-refinery-major-marketers-slash-petrol-prices-fg-push-fuel-costs/</guid>
+      <pubDate>Tue, 07 Jul 2026 09:58:18 +0000</pubDate>
+    </item>
+    <item>
+      <title>Les concessionnaires de BUA et de Dangote Cement publient de nouveaux prix alors que les experts comparent les coûts du Nigeria avec ceux de l'Afrique</title>
+      <link>https://www.legit.ng/business-economy/industry/1718001-bua-dangote-cement-dealers-release-fresh-prices-experts-compare-nigerias-cost-africa/</link>
+      <description>Les concessionnaires de BUA et de Dangote Cement publient de nouveaux prix alors que les experts comparent les coûts du Nigeria avec ceux de l'Afrique</description>
+      <content:encoded><![CDATA[<p>Les concessionnaires de BUA et de Dangote Cement publient de nouveaux prix alors que les experts comparent les coûts du Nigeria avec ceux de l'Afrique</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/business-economy/industry/1718001-bua-dangote-cement-dealers-release-fresh-prices-experts-compare-nigerias-cost-africa/</guid>
+      <pubDate>Tue, 07 Jul 2026 12:26:19 +0000</pubDate>
+    </item>
+    <item>
+      <title>Les dépôts réduisent l'essence en dessous du tarif de Dangote alors que FG exige une réduction</title>
+      <link>https://www.legit.ng/business-economy/energy/1717950-price-war-depot-owners-release-petrol-prices-dangotes-rate/</link>
+      <description>Les dépôts réduisent l'essence en dessous du tarif de Dangote alors que FG exige une réduction</description>
+      <content:encoded><![CDATA[<p>Les dépôts réduisent l'essence en dessous du tarif de Dangote alors que FG exige une réduction</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/business-economy/energy/1717950-price-war-depot-owners-release-petrol-prices-dangotes-rate/</guid>
+      <pubDate>Tue, 07 Jul 2026 09:04:08 +0000</pubDate>
+    </item>
+    <item>
+      <title>L'Arabie Saoudite publie une liste de 14 pays non éligibles au visa à l'arrivée</title>
+      <link>https://www.legit.ng/nigeria/1718093-saudi-arabia-releases-list-14-countries-eligible-visa-arrival/</link>
+      <description>L'Arabie Saoudite publie une liste de 14 pays non éligibles au visa à l'arrivée</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/98215f963e9b4f13.jpeg?v=1" alt="Saudi Arabia releases list of 14 countries not eligible for visa on arrival" style="max-width:100%;"/><br/><p>L'Arabie Saoudite publie une liste de 14 pays non éligibles au visa à l'arrivée</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/nigeria/1718093-saudi-arabia-releases-list-14-countries-eligible-visa-arrival/</guid>
+      <pubDate>Tue, 07 Jul 2026 21:00:53 +0000</pubDate>
+    </item>
+    <item>
+      <title>Fausse agence présumée : « Pourquoi l’Assemblée nationale a affecté 1,3 milliard de livres sterling, explique le Sénat</title>
+      <link>https://www.legit.ng/politics/1718126-alleged-fake-agency-national-assembly-appropriated-13bn-senate-explains/</link>
+      <description>Fausse agence présumée : « Pourquoi l’Assemblée nationale a affecté 1,3 milliard de livres sterling, explique le Sénat</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/190x107/08ace70d82f66de8.jpeg?v=1" alt="Alleged fake agency: “Why National Assembly appropriated ₦1.3bn, Senate explains" style="max-width:100%;"/><br/><p>Fausse agence présumée : « Pourquoi l’Assemblée nationale a affecté 1,3 milliard de livres sterling, explique le Sénat</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/politics/1718126-alleged-fake-agency-national-assembly-appropriated-13bn-senate-explains/</guid>
+      <pubDate>Wed, 08 Jul 2026 06:50:03 +0000</pubDate>
+    </item>
+    <item>
+      <title>Breaking: l'épouse d'El-Rufai écrit à Tinubu, "nous sommes traumatisés"</title>
+      <link>https://www.legit.ng/nigeria/1718101-breaking-el-rufais-wife-writes-tinubu-traumatized/</link>
+      <description>Breaking: l'épouse d'El-Rufai écrit à Tinubu, "nous sommes traumatisés"</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/190x107/4bd93f7ab72c3652.jpeg?v=1" alt="Breaking: El-Rufai's wife writes Tinubu, "we are traumatized"" style="max-width:100%;"/><br/><p>Breaking: l'épouse d'El-Rufai écrit à Tinubu, "nous sommes traumatisés"</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/nigeria/1718101-breaking-el-rufais-wife-writes-tinubu-traumatized/</guid>
+      <pubDate>Wed, 08 Jul 2026 07:13:37 +0000</pubDate>
+    </item>
+    <item>
+      <title>18 gouverneurs du premier mandat se réunissent à huis clos, tendances vidéo</title>
+      <link>https://www.legit.ng/politics/1718110-18-term-governors-meet-closed-door-video-trends/</link>
+      <description>18 gouverneurs du premier mandat se réunissent à huis clos, tendances vidéo</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/190x107/859ec4a3c23fac43.jpeg?v=1" alt="18 first term governors meet behind closed door, video trends" style="max-width:100%;"/><br/><p>18 gouverneurs du premier mandat se réunissent à huis clos, tendances vidéo</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/politics/1718110-18-term-governors-meet-closed-door-video-trends/</guid>
+      <pubDate>Wed, 08 Jul 2026 07:57:05 +0000</pubDate>
+    </item>
+    <item>
+      <title>Rupture : le président de LG abandonne APC et démissionne de ses fonctions avant 2027</title>
+      <link>https://www.legit.ng/politics/1718128-breaking-lg-chairman-dumps-apc-resigns-office-2027/</link>
+      <description>Rupture : le président de LG abandonne APC et démissionne de ses fonctions avant 2027</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/190x107/c0705c5bec4dedc4.jpeg?v=1" alt="Breaking: LG chairman dumps APC, resigns from office ahead of 2027" style="max-width:100%;"/><br/><p>Rupture : le président de LG abandonne APC et démissionne de ses fonctions avant 2027</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/politics/1718128-breaking-lg-chairman-dumps-apc-resigns-office-2027/</guid>
+      <pubDate>Wed, 08 Jul 2026 08:05:34 +0000</pubDate>
+    </item>
+    <item>
+      <title>Est-ce le vrai juge qui a déclaré Tinubu vainqueur, ayant perdu la vue après une opération ? Des faits émergent</title>
+      <link>https://www.legit.ng/politics/1718069-is-true-judge-declared-tinubu-winner-lost-eyesight-surgery/</link>
+      <description>Les affirmations selon lesquelles la juge Tsamma Abubakar, qui a déclaré le président Bola Ahmed Tinubu vainqueur des élections de 2023, seraient devenues aveugles après une opération chirurgicale ont été vérifiées.</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/720x405/8ae0ce473e34087c.jpeg?v=1" alt="Is it true judge who declared Tinubu the winner lost eyesight after surgery? Facts emerge" style="max-width:100%;"/><br/><p>Les affirmations selon lesquelles la juge Tsamma Abubakar, qui a déclaré le président Bola Ahmed Tinubu vainqueur des élections de 2023, seraient devenues aveugles après une opération chirurgicale ont été vérifiées.</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/politics/1718069-is-true-judge-declared-tinubu-winner-lost-eyesight-surgery/</guid>
+      <pubDate>Wed, 08 Jul 2026 05:33:52 +0000</pubDate>
+    </item>
+    <item>
+      <title>Tragédie : une femme brûle à mort les deux filles de son amant</title>
+      <link>https://www.legit.ng/nigeria/1718123-suspect-arrested-investigation-currently-ongoing/</link>
+      <description>Tragédie : une femme brûle à mort les deux filles de son amant</description>
+      <content:encoded><![CDATA[<p>Tragédie : une femme brûle à mort les deux filles de son amant</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/nigeria/1718123-suspect-arrested-investigation-currently-ongoing/</guid>
+      <pubDate>Wed, 08 Jul 2026 05:54:48 +0000</pubDate>
+    </item>
+    <item>
+      <title>La FIFA ouvre une enquête alors que l'entraîneur et le joueur égyptiens envoient un message fort sur la victoire controversée de l'Argentine</title>
+      <link>https://www.legit.ng/sports/football/1718122-fifa-opens-investigation-egypt-coach-player-send-strong-message-controversial-argentina-win/</link>
+      <description>La FIFA ouvre une enquête alors que l'entraîneur et le joueur égyptiens envoient un message fort sur la victoire controversée de l'Argentine</description>
+      <content:encoded><![CDATA[<p>La FIFA ouvre une enquête alors que l'entraîneur et le joueur égyptiens envoient un message fort sur la victoire controversée de l'Argentine</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/sports/football/1718122-fifa-opens-investigation-egypt-coach-player-send-strong-message-controversial-argentina-win/</guid>
+      <pubDate>Wed, 08 Jul 2026 06:45:45 +0000</pubDate>
+    </item>
+    <item>
+      <title>Uche Ogbodo s'exprime au milieu des rumeurs autour de son mariage avec un jeune acteur : "Marié avec une princesse"</title>
+      <link>https://www.legit.ng/entertainment/celebrities/1718130-uche-ogbodo-speaks-rumours-surrounding-marriage-young-actor-married-a-princess/</link>
+      <description>Uche Ogbodo s'exprime au milieu des rumeurs autour de son mariage avec un jeune acteur : "Marié avec une princesse"</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/360x203/ce3ba903b4110929.jpeg?v=1" alt="Uche Ogbodo speaks out amid rumours surrounding her marriage with young actor: “Married a princess”" style="max-width:100%;"/><br/><p>Uche Ogbodo s'exprime au milieu des rumeurs autour de son mariage avec un jeune acteur : "Marié avec une princesse"</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/entertainment/celebrities/1718130-uche-ogbodo-speaks-rumours-surrounding-marriage-young-actor-married-a-princess/</guid>
+      <pubDate>Wed, 08 Jul 2026 07:37:26 +0000</pubDate>
+    </item>
+    <item>
+      <title>Le dilemme d'El-Rufai : tension alors que l'ADC annonce un nouveau développement</title>
+      <link>https://www.legit.ng/nigeria/1718096-el-rufais-dilemma-tension-adc-announces-development/</link>
+      <description>L'ADC a annoncé un nouveau développement suite à l'arrestation du médecin de l'immédiat gouverneur sortant de l'Etat de Kaduna, Nasir El-Rufai, à Abuja.</description>
+      <content:encoded><![CDATA[<img src="https://cdn.legit.ng/images/190x107/d988bc9698014222.jpeg?v=1" alt="El-Rufai's dilemma: Tension as ADC announces new development" style="max-width:100%;"/><br/><p>L'ADC a annoncé un nouveau développement suite à l'arrestation du médecin de l'immédiat gouverneur sortant de l'Etat de Kaduna, Nasir El-Rufai, à Abuja.</p>]]></content:encoded>
+      <guid isPermaLink="true">https://www.legit.ng/nigeria/1718096-el-rufais-dilemma-tension-adc-announces-development/</guid>
+      <pubDate>Wed, 08 Jul 2026 07:09:18 +0000</pubDate>
     </item>
   </channel>
 </rss>
