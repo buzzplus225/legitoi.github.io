@@ -26,30 +26,47 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      # Étape 1: Checkout
+      # ============================================================
+      # ÉTAPE 1: CHECKOUT OBLIGATOIRE
+      # ============================================================
       - name: Récupération du code source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          # NE PAS spécifier 'path' - garder le répertoire par défaut
 
-      # Étape 2: Debug git
+      # ============================================================
+      # ÉTAPE 2: VÉRIFICATION GIT
+      # ============================================================
       - name: Vérification du dépôt
         run: |
-          echo "📁 Répertoire courant: $(pwd)"
-          echo "📋 Contenu:"
+          echo "📁 Répertoire de travail: $(pwd)"
+          echo ""
+          echo "📋 Contenu du répertoire:"
           ls -la
-          echo "🔍 Vérification de .git:"
+          echo ""
+          echo "🔍 Recherche de .git:"
           if [ -d ".git" ]; then
-            echo "✅ .git existe"
+            echo "✅ .git trouvé"
+            echo ""
+            echo "📊 Statut git:"
             git status
+            echo ""
+            echo "🌿 Branches disponibles:"
             git branch -a
           else
-            echo "❌ .git n'existe pas !"
-            exit 1
+            echo "❌ .git NON TROUVÉ"
+            echo "Tentative d'initialisation..."
+            git init
+            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+            git fetch origin
+            git checkout main || git checkout -b main
           fi
 
-      # Étape 3: Python
+      # ============================================================
+      # ÉTAPE 3: PYTHON
+      # ============================================================
       - name: Installation de Python
         uses: actions/setup-python@v5
         with:
@@ -57,17 +74,21 @@ jobs:
           cache: 'pip'
           cache-dependency-path: requirements.txt
 
-      # Étape 4: Dépendances
+      # ============================================================
+      # ÉTAPE 4: DÉPENDANCES
+      # ============================================================
       - name: Installation des dépendances
         run: |
           echo "📦 Installation des dépendances..."
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
           echo ""
-          echo "✅ Versions installées:"
-          pip list | grep -E "cloudscraper|beautifulsoup4|lxml|feedgen|transformers|torch|sentencepiece|protobuf|dateutil"
+          echo "✅ Dépendances installées:"
+          pip list | grep -E "cloudscraper|beautifulsoup4|lxml|feedgen|transformers|torch|sentencepiece"
 
-      # Étape 5: Scraping
+      # ============================================================
+      # ÉTAPE 5: SCRAPING
+      # ============================================================
       - name: Exécution du scraper
         run: |
           echo "🚀 Début du scraping: $(date)"
@@ -77,13 +98,14 @@ jobs:
           if [ -f "feed.xml" ]; then
             echo "✅ feed.xml généré"
             echo "📊 Taille: $(wc -c < feed.xml) octets"
-            echo "📝 Nombre de lignes: $(wc -l < feed.xml)"
           else
             echo "❌ feed.xml non créé"
             exit 1
           fi
 
-      # Étape 6: GitHub Pages
+      # ============================================================
+      # ÉTAPE 6: GITHUB PAGES
+      # ============================================================
       - name: Publication sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -96,41 +118,57 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
 
-      # Étape 7: Commit sur main
+      # ============================================================
+      # ÉTAPE 7: COMMIT SUR MAIN (CORRIGÉ)
+      # ============================================================
       - name: Commit et push vers main
         run: |
-          cd $GITHUB_WORKSPACE
+          echo "📁 Répertoire courant: $(pwd)"
           
-          # Vérifier .git
+          # Vérifier si .git existe, sinon l'initialiser
           if [ ! -d ".git" ]; then
-            echo "❌ .git n'existe pas"
-            exit 1
+            echo "⚠️ .git n'existe pas, initialisation..."
+            git init
+            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+            git fetch origin
+            git checkout main || git checkout -b main
           fi
           
           # Configurer git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # S'assurer d'être sur main
-          git checkout main || git checkout -b main
+          # Vérifier qu'on est sur main
+          echo "🌿 Branche actuelle:"
+          git branch
+          echo ""
+          
+          # Si on est pas sur main, essayer de checkout
+          CURRENT_BRANCH=$(git branch --show-current)
+          if [ "$CURRENT_BRANCH" != "main" ]; then
+            echo "⚠️ Pas sur main, tentative de checkout..."
+            git checkout main || git checkout -b main
+          fi
           
           # Ajouter le fichier
           git add feed.xml
           
           # Vérifier les changements
           if git diff --staged --quiet; then
-            echo "✅ Aucun changement détecté"
+            echo "✅ Aucun changement détecté dans feed.xml"
             echo "Le flux RSS est déjà à jour"
           else
-            echo "📝 Changements détectés"
+            echo "📝 Changements détectés, commit en cours..."
             git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M')"
             git push origin main
-            echo "✅ Push effectué"
+            echo "✅ Push effectué avec succès"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Étape 8: Résumé
+      # ============================================================
+      # ÉTAPE 8: RÉSUMÉ
+      # ============================================================
       - name: Résumé de l'exécution
         if: always()
         run: |
@@ -147,6 +185,6 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 📝 Extrait du flux" >> $GITHUB_STEP_SUMMARY
             echo '```xml' >> $GITHUB_STEP_SUMMARY
-            head -30 feed.xml >> $GITHUB_STEP_SUMMARY
+            head -20 feed.xml >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
