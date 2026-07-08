@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Scraper RSS automatique pour Legit.ng avec traduction en français
-Ce script scrape les articles de legit.ng, les traduit en français,
-et génère un flux RSS accessible publiquement.
+Version optimisée pour GitHub Actions (Robuste et Économe en ressources)
 """
 
 import os
@@ -11,8 +10,8 @@ import sys
 import time
 import random
 import logging
-from datetime import datetime, timezone
-from typing import Optional, List, Tuple
+from datetime import datetime, timezone, timedelta
+from typing import Optional, List
 import re
 
 # Configuration du logging
@@ -23,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# SECTION 1: Importation des bibliothèques
+# SECTION 1: Importation des bibliothèques avec fallbacks robustes
 # ==============================================================================
 
 try:
@@ -38,13 +37,20 @@ from lxml import html
 from feedgen.feed import FeedGenerator
 from dateutil import parser
 
-# Imports pour la traduction
+# Tiers-1 : Traducteur alternatif léger (évite d'exploser la RAM de GitHub Actions)
+try:
+    from deep_translator import GoogleTranslator as BackupTranslator
+    HAS_DEEP_TRANSLATE = True
+except ImportError:
+    HAS_DEEP_TRANSLATE = False
+
+# Tiers-2 : Modèle lourd Transformers
 try:
     from transformers import MarianMTModel, MarianTokenizer
+    import torch
     HAS_TRANSFORMERS = True
 except ImportError:
     HAS_TRANSFORMERS = False
-    logger.warning("transformers non disponible, traduction désactivée")
 
 # ==============================================================================
 # SECTION 2: Configuration
@@ -52,268 +58,205 @@ except ImportError:
 
 SOURCE_URL = "https://www.legit.ng/"
 FEED_URL = "https://buzzplus225.github.io/legitoi.github.io/feed.xml"
-FEED_TITLE = "Legit.ng - Actualités traduites en français"
+FEED_TITLE = "Legit.ng - Actualités en Français"
 
-MAX_ARTICLES = 20
-MAX_RSS_ITEMS = 15
-MIN_DELAY = 2
-MAX_DELAY = 5
+MAX_ARTICLES = 25
+MAX_RSS_ITEMS = 20
+MIN_DELAY = 1
+MAX_DELAY = 3
 REQUEST_TIMEOUT = 30
-MAX_TEXT_LENGTH = 512
+MAX_TEXT_LENGTH = 400
 MAX_RETRIES = 3
 
 USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 ]
 
 # ==============================================================================
-# SECTION 3: Classe de traduction
+# SECTION 3: Classe de traduction hybride (Performance max)
 # ==============================================================================
 
-class Translator:
+class HybrideTranslator:
     def __init__(self):
+        self.mode = "none"
         self.model = None
         self.tokenizer = None
-        self._load_model()
-
-    def _load_model(self):
-        if not HAS_TRANSFORMERS:
-            logger.warning("Transformers non installé, traduction désactivée")
-            return
-
-        try:
-            model_name = "Helsinki-NLP/opus-mt-en-fr"
-            logger.info(f"Chargement du modèle: {model_name}")
-            
-            self.tokenizer = MarianTokenizer.from_pretrained(model_name)
-            self.model = MarianMTModel.from_pretrained(model_name)
-            
-            logger.info("✓ Modèle chargé avec succès")
-
-        except Exception as e:
-            logger.error(f"Erreur chargement modèle: {e}")
-            self.model = None
-            self.tokenizer = None
+        
+        # Choix de la meilleure méthode disponible
+        if HAS_DEEP_TRANSLATE:
+            logger.info("📚 Utilisation de deep-translator (Léger et Rapide)")
+            self.mode = "deep_translator"
+            self.engine = BackupTranslator(source='en', target='fr')
+        elif HAS_TRANSFORMERS:
+            try:
+                model_name = "Helsinki-NLP/opus-mt-en-fr"
+                logger.info(f"📚 Chargement du modèle local: {model_name}")
+                self.tokenizer = MarianTokenizer.from_pretrained(model_name)
+                self.model = MarianMTModel.from_pretrained(model_name)
+                self.mode = "transformers"
+            except Exception as e:
+                logger.error(f"Impossible de charger Transformers: {e}")
+                self.mode = "none"
+        else:
+            logger.warning("⚠️ Aucun moteur de traduction trouvé. Le texte restera en anglais.")
 
     def translate(self, text: str) -> str:
-        if self.model is None or self.tokenizer is None:
-            return text
-        
         if not text or not text.strip():
             return text
 
+        text = re.sub(r'\s+', ' ', text).strip()
+        if len(text) > MAX_TEXT_LENGTH:
+            text = text[:MAX_TEXT_LENGTH] + "..."
+
         try:
-            # Nettoyer le texte
-            text = re.sub(r'\s+', ' ', text).strip()
+            if self.mode == "deep_translator":
+                return self.engine.translate(text)
             
-            if len(text) > MAX_TEXT_LENGTH:
-                text = text[:MAX_TEXT_LENGTH]
-                logger.warning(f"Texte tronqué à {MAX_TEXT_LENGTH} caractères")
-
-            inputs = self.tokenizer(
-                text,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                max_length=MAX_TEXT_LENGTH
-            )
-
-            translated = self.model.generate(**inputs)
-            result = self.tokenizer.decode(translated[0], skip_special_tokens=True)
-            
-            return result
-
+            elif self.mode == "transformers" and self.model and self.tokenizer:
+                inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+                with torch.no_grad():
+                    translated = self.model.generate(**inputs)
+                return self.tokenizer.decode(translated[0], skip_special_tokens=True)
+                
         except Exception as e:
-            logger.error(f"Erreur de traduction: {e}")
-            return text
+            logger.error(f"Erreur lors de la traduction: {e}")
+            
+        return text
 
 # ==============================================================================
-# SECTION 4: Fonctions de scraping
+# SECTION 4: Fonctions de parsing et scraping optimisées
 # ==============================================================================
+
+def clean_date(date_str: str) -> datetime:
+    """Convertit les dates relatives (ex: '2 hours ago') ou absolues en datetime UTC"""
+    now = datetime.now(timezone.utc)
+    if not date_str:
+        return now
+    
+    date_str_clean = date_str.lower().strip()
+    
+    # Gestion des formats relatifs de Legit.ng
+    try:
+        if "minute" in date_str_clean:
+            minutes = int(re.search(r'\d+', date_str_clean).group())
+            return now - timedelta(minutes=minutes)
+        elif "hour" in date_str_clean:
+            hours = int(re.search(r'\d+', date_str_clean).group())
+            return now - timedelta(hours=hours)
+        elif "day" in date_str_clean:
+            days = int(re.search(r'\d+', date_str_clean).group())
+            return now - timedelta(days=days)
+        elif "yesterday" in date_str_clean:
+            return now - timedelta(days=1)
+        
+        # Fallback vers le parseur standard
+        return parser.parse(date_str, fuzzy=True).replace(tzinfo=timezone.utc)
+    except Exception:
+        return now
 
 def fetch_page(url: str) -> Optional[html.HtmlElement]:
-    """Récupère le contenu HTML d'une page"""
+    """Récupère le code HTML de la page"""
     html_content = None
     
-    # Tentative avec cloudscraper
     if HAS_CLOUDSCRAPER:
-        for attempt in range(MAX_RETRIES):
-            try:
-                logger.info(f"Tentative {attempt + 1}/{MAX_RETRIES} avec cloudscraper")
-                scraper = cloudscraper.create_scraper(browser='chrome')
-                response = scraper.get(url, timeout=REQUEST_TIMEOUT)
-                response.raise_for_status()
+        try:
+            scraper = cloudscraper.create_scraper(browser='chrome')
+            response = scraper.get(url, timeout=REQUEST_TIMEOUT)
+            if response.status_code == 200:
                 html_content = response.text
-                logger.info("✓ Page récupérée avec cloudscraper")
-                break
-            except Exception as e:
-                logger.warning(f"Échec cloudscraper (tentative {attempt + 1}): {e}")
-                time.sleep(3 * (attempt + 1))
+        except Exception as e:
+            logger.warning(f"Échec cloudscraper: {e}")
 
-    # Fallback avec requests
     if html_content is None:
-        for attempt in range(MAX_RETRIES):
-            try:
-                logger.info(f"Tentative {attempt + 1}/{MAX_RETRIES} avec requests")
-                headers = {
-                    'User-Agent': random.choice(USER_AGENTS),
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'DNT': '1',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1'
-                }
-                response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-                response.raise_for_status()
+        try:
+            headers = {'User-Agent': random.choice(USER_AGENTS)}
+            response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
+            if response.status_code == 200:
                 html_content = response.text
-                logger.info("✓ Page récupérée avec requests")
-                break
-            except Exception as e:
-                logger.warning(f"Échec requests (tentative {attempt + 1}): {e}")
-                time.sleep(3 * (attempt + 1))
+        except Exception as e:
+            logger.error(f"Échec global de récupération: {e}")
 
     if html_content:
         try:
             return html.fromstring(html_content)
         except Exception as e:
             logger.error(f"Erreur parsing lxml: {e}")
-            return None
-
+            
     return None
 
 def scrape_legit_ng() -> List[dict]:
-    """Scrape les articles de legit.ng"""
+    """Scrape le contenu de la page d'accueil de Legit.ng"""
     articles = []
     tree = fetch_page(SOURCE_URL)
     
     if tree is None:
-        logger.error("Impossible de récupérer la page principale")
         return articles
 
-    # XPath patterns
-    patterns = [
-        '//article[@data-post-id]',
-        '//article[contains(@class, "post")]',
-        '//div[contains(@class, "article")]//article',
-        '//article'
-    ]
-    
-    article_nodes = []
-    for pattern in patterns:
-        nodes = tree.xpath(pattern)
-        if nodes:
-            logger.info(f"✓ Trouvé {len(nodes)} articles avec: {pattern}")
-            article_nodes = nodes
+    # Sélecteurs XPath mis à jour (Cible les structures d'articles Genesis Media)
+    nodes = tree.xpath('//article[contains(@class, "c-article")] | //div[contains(@class, "c-article")] | //article')
+    if not nodes:
+        # Fallback de secours si le site a changé ses classes de composants
+        nodes = tree.xpath('//a[contains(@class, "news")]/ancestor::div[1] | //h2/ancestor::article')
+
+    logger.info(f"📌 Nœuds d'articles potentiels identifiés : {len(nodes)}")
+
+    for node in nodes:
+        if len(articles) >= MAX_ARTICLES:
             break
-    
-    if not article_nodes:
-        logger.warning("Aucun article trouvé")
-        return articles
-
-    for node in article_nodes[:MAX_ARTICLES]:
         try:
-            # Titre
-            title_xpaths = [
-                './/a[contains(@class, "headline")]/span[contains(@class, "hover-inner")]/text()',
-                './/a[contains(@class, "headline")]/text()',
-                './/h2/a/text()',
-                './/h3/a/text()',
-                './/a[contains(@class, "title")]/text()'
-            ]
+            # Extraction du titre
+            title_raw = node.xpath('.//a[contains(@class, "headline")]//text() | .//h3/a/text() | .//h2//text() | .//a/span/text()')
+            title = " ".join([t.strip() for t in title_raw if t.strip()]).strip()
             
-            title = None
-            for xpath in title_xpaths:
-                elem = node.xpath(xpath)
-                if elem and elem[0].strip():
-                    title = elem[0].strip()
-                    break
+            # Extraction de l'URL
+            url_raw = node.xpath('.//a[contains(@class, "headline")]/@href | .//h3/a/@href | .//h2/a/@href | .//a/@href')
+            url = url_raw[0].strip() if url_raw else None
 
-            # URL
-            url_xpaths = [
-                './/a[contains(@class, "headline")]/@href',
-                './/h2/a/@href',
-                './/h3/a/@href',
-                './/a[contains(@class, "title")]/@href'
-            ]
-            
-            url = None
-            for xpath in url_xpaths:
-                elem = node.xpath(xpath)
-                if elem:
-                    url = elem[0]
-                    break
-
-            # Image
-            img_xpaths = [
-                './/div[contains(@class, "thumbnail-picture")]//img/@src',
-                './/img[contains(@class, "featured")]/@src',
-                './/img/@src'
-            ]
-            
-            image = ''
-            for xpath in img_xpaths:
-                elem = node.xpath(xpath)
-                if elem:
-                    image = elem[0]
-                    if not image.startswith('http'):
-                        image = 'https://www.legit.ng' + image
-                    break
-
-            # Description
-            desc_xpaths = [
-                './/p[contains(@class, "description")]/text()',
-                './/p[contains(@class, "excerpt")]/text()',
-                './/div[contains(@class, "excerpt")]/p/text()'
-            ]
-            
-            description = ''
-            for xpath in desc_xpaths:
-                elem = node.xpath(xpath)
-                if elem and elem[0].strip():
-                    description = elem[0].strip()
-                    break
-
-            # Date
-            date_xpaths = [
-                './/time[contains(@class, "time")]/text()',
-                './/time/@datetime',
-                './/span[contains(@class, "date")]/text()'
-            ]
-            
-            date = ''
-            for xpath in date_xpaths:
-                elem = node.xpath(xpath)
-                if elem:
-                    date = elem[0].strip()
-                    break
-
-            if not title or not url:
+            if not title or not url or len(title) < 10:
                 continue
 
-            # Normaliser l'URL
+            # Normalisation de l'URL
             if url.startswith('/'):
                 url = 'https://www.legit.ng' + url
             elif not url.startswith('http'):
-                url = 'https://www.legit.ng/' + url
+                continue
+
+            # Éviter les doublons instantanés
+            if any(a['url'] == url for a in articles):
+                continue
+
+            # Extraction de l'image (Gestion critique du Lazy-Loading)
+            image = ""
+            img_src = node.xpath('.//img/@data-src | .//img/@data-original | .//img/@srcset | .//img/@src')
+            if img_src:
+                image = img_src[0].split(' ')[0].strip()  # Prend la première URL si srcset
+                if image.startswith('/'):
+                    image = 'https://www.legit.ng' + image
+
+            # Extraction de la description / Excerpt
+            desc_raw = node.xpath('.//p/text() | .//div[contains(@class, "excerpt")]/text()')
+            description = " ".join([d.strip() for d in desc_raw if d.strip()]).strip()
+
+            # Extraction de la date
+            date_raw = node.xpath('.//time/@datetime | .//time/text() | .//span[contains(@class, "date")]/text()')
+            date_str = date_raw[0].strip() if date_raw else ""
+            date_obj = clean_date(date_str)
 
             articles.append({
                 'title': title,
                 'url': url,
                 'image': image,
-                'description': description,
-                'date': date
+                'description': description if description else title,
+                'date': date_obj
             })
-
-            logger.info(f"✓ Article {len(articles)}: {title[:40]}...")
-
-            # Pause entre les articles
+            
+            logger.info(f"✨ Article capturé: {title[:45]}...")
             time.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
 
         except Exception as e:
-            logger.error(f"Erreur parsing article: {e}")
+            logger.debug(f"Erreur lors du traitement d'un nœud d'article: {e}")
             continue
 
     return articles
@@ -322,156 +265,78 @@ def scrape_legit_ng() -> List[dict]:
 # SECTION 5: Génération du flux RSS
 # ==============================================================================
 
-def generate_rss_feed(articles: List[dict], translator: Translator) -> str:
-    """Génère le flux RSS"""
+def generate_rss_feed(articles: List[dict], translator: HybrideTranslator) -> str:
+    """Génère la structure XML du flux RSS final"""
     fg = FeedGenerator()
-    
     fg.id(FEED_URL)
     fg.title(FEED_TITLE)
     fg.link(href=FEED_URL, rel='self')
     fg.link(href=SOURCE_URL, rel='alternate')
-    fg.description("Actualités de Legit.ng traduites automatiquement en français")
+    fg.description("Flux d'actualités Legit.ng traduit automatiquement en Français")
     fg.language('fr')
-    fg.copyright(f"© {datetime.now().year} Legit.ng - Traduit automatiquement")
+    fg.copyright(f"© {datetime.now().year} Legit.ng - Traduction Automatique")
+    fg.lastBuildDate(datetime.now(timezone.utc))
     
-    now = datetime.now(timezone.utc)
-    fg.lastBuildDate(now)
-    
-    # Limiter le nombre d'articles dans le flux
     for article in articles[:MAX_RSS_ITEMS]:
-        entry = fg.add_entry()
-        
-        # Traduire le titre
-        translated_title = translator.translate(article['title']) if translator else article['title']
-        entry.title(translated_title)
-        
-        # Traduire la description
-        description = article.get('description', '')
-        translated_desc = translator.translate(description) if translator and description else description
-        
-        # Construire le contenu
-        content_parts = []
-        
-        if article.get('image'):
-            content_parts.append(f'<img src="{article["image"]}" alt="{translated_title}" style="max-width:100%;height:auto;border-radius:8px;margin:10px 0;">')
-        
-        content_parts.append(f'<h2>{translated_title}</h2>')
-        
-        if translated_desc:
-            content_parts.append(f'<p>{translated_desc}</p>')
-        
-        if article.get('date'):
-            content_parts.append(f'<p><small>📅 Date originale: {article["date"]}</small></p>')
-        
-        content_parts.append(f'<p><a href="{article["url"]}" target="_blank" style="display:inline-block;background:#1a73e8;color:white;padding:8px 16px;border-radius:4px;text-decoration:none;">📰 Lire l\'article original</a></p>')
-        
-        entry.content(''.join(content_parts), type='html')
-        entry.link(href=article['url'])
-        entry.id(article['url'])
-        
-        # Gérer la date de publication
         try:
-            if article.get('date'):
-                try:
-                    article_date = parser.parse(article['date'], fuzzy=True)
-                    entry.published(article_date.replace(tzinfo=timezone.utc))
-                except:
-                    entry.published(now)
-            else:
-                entry.published(now)
-        except:
-            entry.published(now)
-    
-    rss_feed = fg.rss_str(pretty=True)
-    
-    if isinstance(rss_feed, bytes):
-        rss_feed = rss_feed.decode('utf-8')
-    
-    return rss_feed
-
-def validate_rss_feed(rss_content: str) -> bool:
-    """Valide le flux RSS"""
-    try:
-        from xml.etree import ElementTree as ET
-        root = ET.fromstring(rss_content)
-        channel = root.find('channel')
-        
-        if channel is None:
-            logger.error("❌ Flux RSS invalide: pas de channel")
-            return False
-        
-        items = channel.findall('item')
-        if not items:
-            logger.warning("⚠️ Flux RSS vide: aucun item")
-            return False
-        
-        logger.info(f"✅ Flux RSS valide avec {len(items)} items")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur validation RSS: {e}")
-        return False
+            entry = fg.add_entry()
+            
+            # Traduction des champs textuels
+            title_fr = translator.translate(article['title'])
+            desc_fr = translator.translate(article['description'])
+            
+            entry.title(title_fr)
+            entry.link(href=article['url'])
+            entry.id(article['url'])
+            entry.published(article['date'])
+            
+            # Construction du corps HTML de l'item RSS
+            content = "<div>"
+            if article['image']:
+                content += f'<img src="{article["image"]}" alt="{title_fr}" style="max-width:100%; height:auto; border-radius:6px; margin-bottom:12px;" /><br/>'
+            content += f'<p>{desc_fr}</p>'
+            content += f'<p><a href="{article["url"]}" target="_blank" style="color:#1a73e8; text-decoration:none; font-weight:bold;">Lire l\'article original sur Legit.ng ↗</a></p>'
+            content += '</div>'
+            
+            entry.content(content, type='html')
+            
+        except Exception as e:
+            logger.error(f"Erreur ajout item RSS: {e}")
+            continue
+            
+    rss_str = fg.rss_str(pretty=True)
+    return rss_str.decode('utf-8') if isinstance(rss_str, bytes) else rss_str
 
 # ==============================================================================
-# SECTION 6: Fonction principale
+# SECTION 6: Point d'entrée principal
 # ==============================================================================
 
 def main():
-    logger.info("=" * 70)
-    logger.info("🚀 Démarrage du scraper Legit.ng")
-    logger.info("=" * 70)
+    logger.info("=== DÉMARRAGE DU SCRAPER LEGIT.NG EN FRANÇAIS ===")
     
-    # Initialiser le traducteur
-    logger.info("📚 Initialisation du traducteur...")
-    translator = Translator()
+    translator = HybrideTranslator()
     
-    # Scraper les articles
-    logger.info("🔍 Récupération des articles...")
+    logger.info("Scraping en cours...")
     articles = scrape_legit_ng()
     
     if not articles:
-        logger.error("❌ Aucun article récupéré")
+        logger.error("❌ Aucun article valide n'a pu être extrait. Fin du script.")
         sys.exit(1)
+        
+    logger.info(f"✓ {len(articles)} articles extraits avec succès.")
     
-    logger.info(f"✅ Articles récupérés: {len(articles)}")
-    
-    # Générer le flux RSS
-    logger.info("📝 Génération du flux RSS...")
+    logger.info("Génération du flux RSS enrichi...")
     rss_content = generate_rss_feed(articles, translator)
     
-    # Valider le flux
-    if not validate_rss_feed(rss_content):
-        logger.error("❌ Flux RSS invalide")
-        sys.exit(1)
-    
-    # Sauvegarder le fichier
+    # Sauvegarde locale du fichier feed.xml
     output_file = "feed.xml"
-    
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(rss_content)
-        
-        logger.info(f"✅ Flux RSS sauvegardé: {output_file}")
-        logger.info(f"📊 Taille: {len(rss_content)} caractères")
-        
+        logger.info(f"🎉 Le fichier {output_file} a été généré avec succès ({len(rss_content)} octets).")
     except Exception as e:
-        logger.error(f"❌ Erreur sauvegarde: {e}")
+        logger.error(f"❌ Erreur lors de l'écriture du fichier XML: {e}")
         sys.exit(1)
-    
-    # Résumé
-    logger.info("=" * 70)
-    logger.info("✅ Scraping terminé avec succès!")
-    logger.info("=" * 70)
-    
-    print("\n" + "=" * 50)
-    print("📊 RÉSUMÉ")
-    print("=" * 50)
-    print(f"📰 Articles scrapés: {len(articles)}")
-    print(f"📝 Articles dans le flux: {min(len(articles), MAX_RSS_ITEMS)}")
-    print(f"🌐 Traduction: {'✅ Activée' if translator.model else '❌ Désactivée'}")
-    print(f"📁 Fichier: {os.path.abspath(output_file)}")
-    print(f"🔗 URL: {FEED_URL}")
-    print("=" * 50)
 
 if __name__ == "__main__":
     main()
