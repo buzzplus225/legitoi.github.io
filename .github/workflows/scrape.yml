@@ -5,13 +5,15 @@ name: RSS Scraper - Legit.ng vers Français
 
 on:
   schedule:
-    - cron: '0 */4 * * *'
-  workflow_dispatch:
+    - cron: '0 */4 * * *'  # Toutes les 4 heures
+  workflow_dispatch:       # Déclenchement manuel
 
 env:
   PYTHON_VERSION: '3.10'
   PIP_NO_INPUT: 1
   PIP_DEFAULT_TIMEOUT: 100
+  # Forcer Node.js 24 pour éviter les avertissements de dépréciation
+  ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node24
 
 jobs:
   scrape-and-translate:
@@ -27,9 +29,8 @@ jobs:
 
     steps:
       # ============================================================
-      # ÉTAPE 1: CHECKOUT (Récupère proprement la branche main)
+      # ÉTAPE 1: CHECKOUT
       # ============================================================
-      # fetch-depth: 0 charge tout l'historique, indispensable pour éviter les erreurs de rebase
       - name: Récupération du code source
         uses: actions/checkout@v4
         with:
@@ -61,53 +62,103 @@ jobs:
       - name: Installation des dépendances
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          else
+            echo "⚠️ requirements.txt non trouvé, installation minimale"
+            pip install requests lxml feedgen deep-translator cloudscraper beautifulsoup4 python-dateutil
+          fi
           echo "✅ Dépendances installées"
+          pip list | grep -E "requests|lxml|feedgen|deep-translator|cloudscraper"
 
       # ============================================================
-      # ÉTAPE 5: EXÉCUTION DU SCRAPER (Génère feed.xml)
+      # ÉTAPE 5: EXÉCUTION DU SCRAPER
       # ============================================================
       - name: Exécution du scraper
+        id: scraping
         run: |
           echo "🚀 Début du scraping: $(date)"
           python scraper_traducteur.py
           echo "✅ Fin du scraping: $(date)"
           
-          if [ -f "feed.xml" ]; then
-            echo "✅ feed.xml généré"
-            echo "📊 Taille: $(wc -c < feed.xml) octets"
-          else
+          # Vérifications détaillées
+          if [ ! -f "feed.xml" ]; then
             echo "❌ feed.xml non créé"
             exit 1
           fi
+          
+          if [ ! -s "feed.xml" ]; then
+            echo "❌ feed.xml existe mais est vide"
+            exit 1
+          fi
+          
+          # Compter le nombre d'articles dans le feed
+          ARTICLE_COUNT=$(grep -c "<item>" feed.xml || echo "0")
+          echo "📄 Nombre d'articles dans le feed: $ARTICLE_COUNT"
+          echo "article_count=$ARTICLE_COUNT" >> $GITHUB_OUTPUT
+          
+          echo "✅ feed.xml généré avec succès"
+          echo "📊 Taille: $(wc -c < feed.xml) octets"
+          echo "📄 Lignes: $(wc -l < feed.xml)"
+          
+          # Afficher un aperçu
+          echo "📝 Aperçu des 5 premiers articles:"
+          grep -E "<title>|<link>" feed.xml | head -10 || true
 
       # ============================================================
-      # ÉTAPE 6: COMMIT ET PUSH VERS MAIN (Fait AVANT toute bascule de branche)
+      # ÉTAPE 6: SAUVEGARDE DES FICHIERS GÉNÉRÉS (Artifacts)
+      # ============================================================
+      - name: Sauvegarde des fichiers générés
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraping-results
+          path: |
+            feed.xml
+            articles.json
+            articles_cache.json
+          retention-days: 7
+
+      # ============================================================
+      # ÉTAPE 7: COMMIT ET PUSH VERS MAIN
       # ============================================================
       - name: Commit et push vers main
+        if: steps.scraping.outputs.article_count != '0'
         run: |
-          git add feed.xml
+          git add feed.xml articles_cache.json 2>/dev/null || git add feed.xml
           
           if git diff --staged --quiet; then
-            echo "✅ Aucun changement détecté dans feed.xml"
+            echo "✅ Aucun changement détecté dans les fichiers"
           else
             echo "📝 Changements détectés, sauvegarde en cours..."
-            git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M')"
+            git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M') - ${{ steps.scraping.outputs.article_count }} articles"
             
-            # Boucle robuste de rebase / push contre la concurrence
-            for i in {1..3}; do
-              git pull origin main --rebase
+            # Boucle robuste de rebase / push avec délais progressifs
+            MAX_RETRIES=5
+            for i in $(seq 1 $MAX_RETRIES); do
+              echo "🔄 Tentative $i/$MAX_RETRIES..."
+              
+              # Récupérer les derniers changements et rebaser
+              git fetch origin main
+              git rebase origin/main
+              
               if git push origin main; then
                 echo "✅ Push effectué avec succès"
                 break
               fi
-              echo "⚠️ Échec du push, nouvelle tentative dans 5 secondes..."
-              sleep 5
+              
+              if [ $i -eq $MAX_RETRIES ]; then
+                echo "❌ Échec après $MAX_RETRIES tentatives"
+                exit 1
+              fi
+              
+              echo "⚠️ Échec du push, nouvelle tentative dans $((i*2)) secondes..."
+              sleep $((i*2))
             done
           fi
 
       # ============================================================
-      # ÉTAPE 7: PUBLICATION SÛRE SUR GITHUB PAGES
+      # ÉTAPE 8: PUBLICATION SUR GITHUB PAGES
       # ============================================================
       - name: Publication sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -122,7 +173,7 @@ jobs:
           user_email: 'github-actions[bot]@users.noreply.github.com'
 
       # ============================================================
-      # ÉTAPE 8: RÉSUMÉ DANS L'INTERFACE GITHUB
+      # ÉTAPE 9: RÉSUMÉ DANS L'INTERFACE GITHUB
       # ============================================================
       - name: Résumé de l'exécution
         if: always()
@@ -133,13 +184,31 @@ jobs:
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| 📅 Date | $(date) |" >> $GITHUB_STEP_SUMMARY
           echo "| ✅ Statut | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📄 Articles | ${{ steps.scraping.outputs.article_count || '0' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 📁 Fichier | feed.xml |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔗 URL | https://buzzplus225.github.io/legitoi.github.io/feed.xml |" >> $GITHUB_STEP_SUMMARY
           
-          if [ -f "feed.xml" ]; then
+          if [ -f "feed.xml" ] && [ -s "feed.xml" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 📝 Extrait du flux généré" >> $GITHUB_STEP_SUMMARY
             echo '```xml' >> $GITHUB_STEP_SUMMARY
-            head -20 feed.xml >> $GITHUB_STEP_SUMMARY
+            head -30 feed.xml >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
+
+      # ============================================================
+      # ÉTAPE 10: NOTIFICATION EN CAS D'ÉCHEC
+      # ============================================================
+      - name: Notification d'échec
+        if: failure()
+        run: |
+          echo "### ❌ Échec du scraping" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Le scraping a échoué. Vérifiez les logs ci-dessus pour plus de détails." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Causes possibles :**" >> $GITHUB_STEP_SUMMARY
+          echo "- Site Legit.ng inaccessible" >> $GITHUB_STEP_SUMMARY
+          echo "- Changement de structure HTML" >> $GITHUB_STEP_SUMMARY
+          echo "- Problème de réseau ou de timeout" >> $GITHUB_STEP_SUMMARY
+          echo "- Erreur dans le script Python" >> $GITHUB_STEP_SUMMARY
+          exit 1
