@@ -11,7 +11,6 @@ import sys
 import time
 import random
 import logging
-# Correction : Ajout de timezone pour gérer les dates au format RSS normalisé
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 
@@ -255,6 +254,9 @@ def scrape_legit_ng() -> List[dict]:
 
             logger.info(f"Article {len(articles)} : {title[:50]}...")
 
+            # Pause entre les articles pour être gentil avec le serveur
+            time.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
+
         except Exception as e:
             logger.error(f"Erreur lors du parsing d'un article: {e}")
             continue
@@ -279,8 +281,9 @@ def generate_rss_feed(articles: List[dict], translator: Translator) -> str:
     fg.description("Actualités de Legit.ng traduites automatiquement en français")
     fg.language('fr')
     
-    # CORRECTION : Ajout explicite de timezone.utc pour éviter l'erreur de feedgen
-    fg.lastBuildDate(datetime.now(timezone.utc))
+    # Utilisation de datetime avec timezone UTC pour feedgen
+    now = datetime.now(timezone.utc)
+    fg.lastBuildDate(now)
 
     for article in articles:
         entry = fg.add_entry()
@@ -307,9 +310,17 @@ def generate_rss_feed(articles: List[dict], translator: Translator) -> str:
         entry.content(content, type='html')
         entry.link(href=article['url'])
         entry.id(article['url'])
-
-        # CORRECTION : feedgen requiert également un objet datetime géolocalisé pour published()
-        entry.published(datetime.now(timezone.utc))
+        
+        # Utilisation de la date de l'article si disponible, sinon now
+        try:
+            if article.get('date'):
+                # Essayer de parser la date
+                article_date = datetime.strptime(article['date'], '%Y-%m-%d %H:%M')
+                entry.published(article_date.replace(tzinfo=timezone.utc))
+            else:
+                entry.published(now)
+        except:
+            entry.published(now)
 
     rss_feed = fg.rss_str(pretty=True)
 
@@ -362,7 +373,7 @@ def main():
 
     print(f"\nRésumé:")
     print(f"- Articles scrapés: {len(articles)}")
-    print(f"- Traduction: {'Activée' if translator.model else 'Désactivée (Vérifier si sentencepiece est installé)'}")
+    print(f"- Traduction: {'Activée' if translator.model else 'Désactivée'}")
     print(f"- Fichier généré: {os.path.abspath(output_file)}")
 
 
