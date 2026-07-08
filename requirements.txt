@@ -12,6 +12,8 @@ feedgen>=0.9.0             # Création et mise à jour de flux RSS/Atom
 
 # Intelligence Artificielle & Traduction
 transformers>=4.30.0       # Chargement du modèle de traduction (Helsinki-NLP)
+sentencepiece>=0.1.99      # Tokenizer pour MarianMT (OBLIGATOIRE)
+protobuf>=3.20.0          # Requis par transformers
 
 # Machine Learning Backend (Version CPU pour plus de légèreté)
 --extra-index-url https://download.pytorch.org/whl/cpu
