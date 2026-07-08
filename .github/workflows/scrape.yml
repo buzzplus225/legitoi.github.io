@@ -27,53 +27,21 @@ jobs:
 
     steps:
       # ============================================================
-      # ÉTAPE 1: CHECKOUT
+      # ÉTAPE 1: CHECKOUT (Récupère proprement la branche main)
       # ============================================================
       - name: Récupération du code source
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main # S'assure d'être explicitement sur main
 
       # ============================================================
-      # ÉTAPE 2: VÉRIFICATION ET CORRECTION GIT
+      # ÉTAPE 2: CONFIGURATION GIT
       # ============================================================
       - name: Configuration Git
         run: |
-          echo "📁 Répertoire: $(pwd)"
-          echo "📋 Contenu:"
-          ls -la
-          
-          # Si .git n'existe pas, l'initialiser correctement
-          if [ ! -d ".git" ]; then
-            echo "⚠️ Initialisation de git..."
-            git init
-            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-            
-            # Récupérer les branches existantes
-            git fetch origin
-            
-            # Si la branche main existe sur le remote
-            if git ls-remote --heads origin main | grep -q main; then
-              echo "✅ Branche main trouvée sur le remote"
-              git fetch origin main
-              git checkout main || git checkout -b main origin/main
-            else
-              echo "⚠️ Création de la branche main"
-              git checkout -b main
-            fi
-          else
-            echo "✅ .git existe"
-            git fetch origin
-            git checkout main || git checkout -b main
-          fi
-          
-          # Configurer git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           echo "🌿 Branche actuelle: $(git branch --show-current)"
-          git status
 
       # ============================================================
       # ÉTAPE 3: PYTHON
@@ -112,7 +80,7 @@ jobs:
           fi
 
       # ============================================================
-      # ÉTAPE 6: GITHUB PAGES
+      # ÉTAPE 6: GITHUB PAGES (Publie feed.xml sur la branche gh-pages)
       # ============================================================
       - name: Publication sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -120,52 +88,36 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .
           publish_branch: gh-pages
-          commit_message: "🔄 Mise à jour RSS - ${{ github.run_id }}"
+          commit_message: "🔄 Mise à jour RSS - ${GITHUB_RUN_ID}"
           force_orphan: true
           keep_files: false
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
 
       # ============================================================
-      # ÉTAPE 7: COMMIT SUR MAIN (CORRIGÉ)
+      # ÉTAPE 7: COMMIT SUR MAIN (Sécurisé contre les conflits de concurrence)
       # ============================================================
       - name: Commit et push vers main
         run: |
-          # S'assurer qu'on est dans le bon répertoire
-          cd $GITHUB_WORKSPACE
-          
-          # Configurer git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Récupérer les dernières modifications du remote
-          echo "🔄 Pull des dernières modifications..."
-          git pull origin main --rebase || true
-          
-          # Ajouter le fichier
           git add feed.xml
           
-          # Vérifier les changements
           if git diff --staged --quiet; then
             echo "✅ Aucun changement détecté dans feed.xml"
-            echo "Le flux RSS est déjà à jour"
           else
-            echo "📝 Changements détectés, commit en cours..."
+            echo "📝 Changements détectés, sauvegarde en cours..."
             git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M')"
             
-            # Push avec force seulement si nécessaire
-            echo "📤 Push vers main..."
-            if git push origin main; then
-              echo "✅ Push effectué avec succès"
-            else
-              echo "⚠️ Push rejeté, tentative de force..."
+            # Utilisation d'une boucle pour gérer d'éventuels commits concurrents sur le dépôt
+            for i in {1..3}; do
               git pull origin main --rebase
-              git push origin main || git push origin main --force-with-lease
-              echo "✅ Push forcé effectué"
-            fi
+              if git push origin main; then
+                echo "✅ Push effectué avec succès"
+                break
+              fi
+              echo "⚠️ Échec du push, nouvelle tentative après attente..."
+              sleep 5
+            done
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ============================================================
       # ÉTAPE 8: RÉSUMÉ
