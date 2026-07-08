@@ -1,0 +1,154 @@
+# ==============================================================================
+# Workflow GitHub Actions pour le scraping automatique de Legit.ng
+# ==============================================================================
+name: RSS Scraper - Legit.ng vers Français
+
+# ==============================================================================
+# DÉCLENCHEURS (Triggers)
+# ==============================================================================
+on:
+  # Exécution automatique toutes les 4 heures
+  schedule:
+    - cron: '0 */4 * * *'
+
+  # Permet de déclencher manuellement depuis l'onglet Actions de GitHub
+  workflow_dispatch:
+
+# ==============================================================================
+# VARIABLES D'ENVIRONNEMENT GLOBALES
+# ==============================================================================
+env:
+  PYTHON_VERSION: '3.10'
+  # Désactive le mode interactif pour pip
+  PIP_NO_INPUT: 1
+
+# ==============================================================================
+# DÉFINITION DES JOBS
+# ==============================================================================
+jobs:
+  scrape-and-translate:
+    name: Scrape, traduit et publie le flux RSS
+    runs-on: ubuntu-latest
+    
+    # Permissions nécessaires pour modifier le dépôt et publier
+    permissions:
+      contents: write      # Pour commiter/pousser des fichiers sur main et gh-pages
+
+    # Délai maximum d'exécution (1 heure)
+    timeout-minutes: 60
+
+    steps:
+      # -----------------------------------------------------------------------
+      # Étape 1: Checkout du dépôt
+      # -----------------------------------------------------------------------
+      - name: Récupération du code source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # -----------------------------------------------------------------------
+      # Étape 2: Configuration de Python 3.10 et du Cache
+      # -----------------------------------------------------------------------
+      - name: Installation de Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          # Le cache utilise maintenant le fichier requirements.txt pour économiser du temps
+          cache: 'pip'
+
+      # -----------------------------------------------------------------------
+      # Étape 3: Installation des dépendances Python
+      # -----------------------------------------------------------------------
+      - name: Installation des dépendances
+        run: |
+          # Mise à jour de pip
+          python -m pip install --upgrade pip
+
+          # Installation propre via le fichier de configuration
+          pip install -r requirements.txt
+
+          # CORRECTION : Installation forcée de sentencepiece exigé par MarianTokenizer
+          pip install sentencepiece
+
+          # Affichage des versions installées (debugging)
+          echo "=== Versions installées ==="
+          pip list | grep -E "cloudscraper|beautifulsoup|lxml|feedgen|transformers|torch|sentencepiece"
+
+      # -----------------------------------------------------------------------
+      # Étape 4: Exécution du scraper
+      # -----------------------------------------------------------------------
+      - name: Exécution du scraper et traduction
+        run: |
+          echo "=== Début du scraping ==="
+          echo "Date: $(date)"
+
+          # Exécution de ton script Python principal
+          python scraper_traducteur.py
+
+          echo "=== Fin du scraping ==="
+
+          # Vérification de sécurité pour s'assurer que le fichier existe
+          if [ -f "feed.xml" ]; then
+            echo "✓ feed.xml généré avec succès"
+            echo "Taille: $(wc -c < feed.xml) octets"
+          else
+            echo "✗ Erreur: feed.xml non créé"
+            exit 1
+          fi
+
+      # -----------------------------------------------------------------------
+      # Étape 5: Publication du fichier sur GitHub Pages (Branche gh-pages)
+      # -----------------------------------------------------------------------
+      - name: Publication sur GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          commit_message: "Mise à jour automatique du flux RSS (${{ github.run_id }})"
+          force_orphan: true
+          keep_files: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+
+      # -----------------------------------------------------------------------
+      # Étape 6: Mise à jour sur la branche principale (main)
+      # -----------------------------------------------------------------------
+      - name: Commit et push vers main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Sécurité : s'assurer d'être positionné sur la branche main
+          git checkout main || git checkout -b main
+          
+          git add feed.xml
+          
+          # On vérifie s'il y a de réels changements dans feed.xml pour éviter les commits vides
+          if git diff --staged --quiet; then
+            echo "Aucun changement détecté dans feed.xml. Push ignoré."
+          else
+            git commit -m "Mise à jour du flux RSS - $(date '+%Y-%m-%d %H:%M')"
+            git push origin main
+          fi
+
+      # -----------------------------------------------------------------------
+      # Étape 7: Résumé visuel dans l'interface GitHub
+      # -----------------------------------------------------------------------
+      - name: Résumé de l'exécution
+        if: always()
+        run: |
+          echo "### Résumé du scraping" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Statut:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fichier généré:** feed.xml" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL du flux:** https://buzzplus225.github.io/legitoi.github.io/feed.xml" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "feed.xml" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Extrait du flux (20 premières lignes)" >> $GITHUB_STEP_SUMMARY
+            echo '```xml' >> $GITHUB_STEP_SUMMARY
+            head -20 feed.xml >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
