@@ -3,18 +3,23 @@
 # ==============================================================================
 
 # Web Scraping & Parsing
-cloudscraper>=1.2.71       # Contournement des protections Cloudflare
-beautifulsoup4>=4.12.0     # Extraction et manipulation des données HTML
-lxml>=4.9.0                # Parser XML/HTML haute performance pour BeautifulSoup
+cloudscraper>=1.2.71
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
 
-# Génération de flux
-feedgen>=0.9.0             # Création et mise à jour de flux RSS/Atom
+# Génération de flux RSS
+feedgen>=0.9.0
 
-# Intelligence Artificielle & Traduction
-transformers>=4.30.0       # Chargement du modèle de traduction (Helsinki-NLP)
-sentencepiece>=0.1.99      # Tokenizer pour MarianMT (OBLIGATOIRE)
-protobuf>=3.20.0          # Requis par transformers
+# Traduction automatique (Helsinki-NLP)
+transformers>=4.30.0
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+tokenizers>=0.13.0
+huggingface-hub>=0.16.0
 
-# Machine Learning Backend (Version CPU pour plus de légèreté)
+# Backend Machine Learning (CPU)
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.0.0
+
+# Utilitaires
+python-dateutil>=2.8.2
