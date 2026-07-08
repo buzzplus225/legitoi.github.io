@@ -23,16 +23,18 @@ jobs:
       pages: write
       id-token: write
 
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       # ============================================================
       # ÉTAPE 1: CHECKOUT (Récupère proprement la branche main)
       # ============================================================
+      # fetch-depth: 0 charge tout l'historique, indispensable pour éviter les erreurs de rebase
       - name: Récupération du code source
         uses: actions/checkout@v4
         with:
-          ref: main # S'assure d'être explicitement sur main
+          ref: main
+          fetch-depth: 0
 
       # ============================================================
       # ÉTAPE 2: CONFIGURATION GIT
@@ -44,7 +46,7 @@ jobs:
           echo "🌿 Branche actuelle: $(git branch --show-current)"
 
       # ============================================================
-      # ÉTAPE 3: PYTHON
+      # ÉTAPE 3: SETUP PYTHON
       # ============================================================
       - name: Installation de Python
         uses: actions/setup-python@v5
@@ -63,7 +65,7 @@ jobs:
           echo "✅ Dépendances installées"
 
       # ============================================================
-      # ÉTAPE 5: SCRAPING
+      # ÉTAPE 5: EXÉCUTION DU SCRAPER (Génère feed.xml)
       # ============================================================
       - name: Exécution du scraper
         run: |
@@ -80,22 +82,7 @@ jobs:
           fi
 
       # ============================================================
-      # ÉTAPE 6: GITHUB PAGES (Publie feed.xml sur la branche gh-pages)
-      # ============================================================
-      - name: Publication sur GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          publish_branch: gh-pages
-          commit_message: "🔄 Mise à jour RSS - ${GITHUB_RUN_ID}"
-          force_orphan: true
-          keep_files: false
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-
-      # ============================================================
-      # ÉTAPE 7: COMMIT SUR MAIN (Sécurisé contre les conflits de concurrence)
+      # ÉTAPE 6: COMMIT ET PUSH VERS MAIN (Fait AVANT toute bascule de branche)
       # ============================================================
       - name: Commit et push vers main
         run: |
@@ -107,20 +94,35 @@ jobs:
             echo "📝 Changements détectés, sauvegarde en cours..."
             git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M')"
             
-            # Utilisation d'une boucle pour gérer d'éventuels commits concurrents sur le dépôt
+            # Boucle robuste de rebase / push contre la concurrence
             for i in {1..3}; do
               git pull origin main --rebase
               if git push origin main; then
                 echo "✅ Push effectué avec succès"
                 break
               fi
-              echo "⚠️ Échec du push, nouvelle tentative après attente..."
+              echo "⚠️ Échec du push, nouvelle tentative dans 5 secondes..."
               sleep 5
             done
           fi
 
       # ============================================================
-      # ÉTAPE 8: RÉSUMÉ
+      # ÉTAPE 7: PUBLICATION SÛRE SUR GITHUB PAGES
+      # ============================================================
+      - name: Publication sur GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          commit_message: "🔄 Déploiement CDN Pages - ${GITHUB_RUN_ID}"
+          force_orphan: true
+          keep_files: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+
+      # ============================================================
+      # ÉTAPE 8: RÉSUMÉ DANS L'INTERFACE GITHUB
       # ============================================================
       - name: Résumé de l'exécution
         if: always()
@@ -136,7 +138,7 @@ jobs:
           
           if [ -f "feed.xml" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 📝 Extrait du flux" >> $GITHUB_STEP_SUMMARY
+            echo "### 📝 Extrait du flux généré" >> $GITHUB_STEP_SUMMARY
             echo '```xml' >> $GITHUB_STEP_SUMMARY
             head -20 feed.xml >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
