@@ -16,3 +16,10 @@ deep-translator>=1.11.4
 
 # Utilitaires
 python-dateutil>=2.8.2
+
+# ==============================================================================
+# Notes importantes:
+# - python-dateutil est utilisé pour le parsing avancé des dates
+# - feedgen génère le fichier feed.xml
+# - deep-translator traduit l'anglais vers le français
+# ==============================================================================
