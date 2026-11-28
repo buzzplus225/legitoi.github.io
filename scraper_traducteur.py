@@ -1,7 +1,12 @@
-# scraper_traducteur.py
-# Version avec XPaths robustes et debug
+#!/usr/bin/env python3
+"""
+Scraper pour Legit.ng avec traduction automatique en français
+Version robuste avec XPaths multiples et gestion d'erreurs améliorée
+"""
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from lxml import html
 import logging
 import time
@@ -20,22 +25,47 @@ MIN_DELAY = 0.5
 MAX_DELAY = 1.5
 CACHE_FILE = "articles_cache.json"
 FEED_FILE = "feed.xml"
-DEBUG = True  # Mode debug pour voir les XPaths
+JSON_FILE = "articles.json"
+DEBUG = True
 
 # -------------------- LOGGING --------------------
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
+# -------------------- SESSION HTTP AVEC RETRY --------------------
+def create_session() -> requests.Session:
+    """Crée une session HTTP avec retry automatique."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+HTTP_SESSION = create_session()
 
 # -------------------- TRADUCTION --------------------
 def translate_text(text: str, target_lang: str = 'fr') -> str:
     """Traduit un texte en français avec gestion d'erreur."""
-    if not text:
+    if not text or not text.strip():
         return ""
+    
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
+        # Limiter la longueur pour éviter les erreurs
         if len(text) > 5000:
             text = text[:5000]
-        return translator.translate(text)
+        
+        result = translator.translate(text)
+        return result if result else text
     except Exception as e:
         logger.warning(f"Erreur de traduction: {e}")
         return text
@@ -44,16 +74,21 @@ def translate_text(text: str, target_lang: str = 'fr') -> str:
 def fetch_page(url: str) -> Optional[html.HtmlElement]:
     """Télécharge la page et retourne un arbre lxml."""
     try:
+        # Essayer cloudscraper d'abord
         try:
             import cloudscraper
             scraper = cloudscraper.create_scraper()
-            response = scraper.get(url, timeout=10)
+            response = scraper.get(url, timeout=15)
         except ImportError:
-            response = requests.get(url, timeout=10, headers={
+            # Fallback sur requests
+            headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            })
+            }
+            response = HTTP_SESSION.get(url, timeout=15, headers=headers)
+        
         response.raise_for_status()
         return html.fromstring(response.content)
+    
     except Exception as e:
         logger.error(f"Erreur lors du fetch de {url}: {e}")
         return None
@@ -78,6 +113,13 @@ def clean_date(date_str: str) -> Optional[datetime]:
     
     for fmt in formats:
         try:
+            # Essayer avec la chaîne complète d'abord
+            return datetime.strptime(date_str, fmt)
+        except (ValueError, TypeError):
+            pass
+        
+        # Essayer en tronquant à 19 caractères
+        try:
             return datetime.strptime(date_str[:19], fmt)
         except (ValueError, TypeError):
             continue
@@ -99,9 +141,30 @@ def save_cache(urls: List[str]):
     """Sauvegarde les URLs scrapées dans le cache."""
     try:
         with open(CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump({'urls': urls, 'updated': datetime.now().isoformat()}, f, ensure_ascii=False, indent=2)
+            json.dump({
+                'urls': urls,
+                'updated': datetime.now().isoformat()
+            }, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.warning(f"Erreur de sauvegarde du cache: {e}")
+
+def normalize_url(url: str, base_url: str = "https://www.legit.ng") -> str:
+    """Normalise une URL relative en URL absolue."""
+    if not url:
+        return ""
+    
+    url = url.strip()
+    
+    # Supprimer les espaces et caractères invalides
+    if any(skip in url for skip in ['#', 'javascript:', 'mailto:', 'tel:', '/search', '/category']):
+        return ""
+    
+    if url.startswith('/'):
+        return base_url + url
+    elif url.startswith('http'):
+        return url
+    else:
+        return ""
 
 # -------------------- EXTRACTION ROBUSTE --------------------
 def extract_text(node, xpath_exprs: List[str]) -> str:
@@ -114,9 +177,10 @@ def extract_text(node, xpath_exprs: List[str]) -> str:
                     text = " ".join([e.strip() for e in elements if e.strip()])
                 else:
                     text = " ".join([e.text_content().strip() for e in elements if e.text_content().strip()])
+                
                 if text:
                     return text
-        except:
+        except Exception:
             continue
     return ""
 
@@ -129,7 +193,7 @@ def extract_attribute(node, xpath_exprs: List[str], attribute: str = 'href') -> 
                 val = elements[0].strip()
                 if val:
                     return val
-        except:
+        except Exception:
             continue
     return ""
 
@@ -143,9 +207,8 @@ def scrape_legit_ng() -> List[dict]:
     tree = fetch_page(SOURCE_URL)
     if tree is None:
         return articles
-
+    
     # === PREMIER PASSAGE : RECHERCHE D'ARTICLES ===
-    # Essayer plusieurs stratégies pour trouver les articles
     nodes = []
     
     # Stratégie 1: Articles HTML5
@@ -163,35 +226,32 @@ def scrape_legit_ng() -> List[dict]:
     if not nodes:
         nodes = tree.xpath('//*[.//h1 or .//h2 or .//h3]')
     
-    # Si on a trop de nodes, filtrer
+    # Limiter le nombre de nodes
     if len(nodes) > 150:
         nodes = nodes[:150]
     
-    # En mode debug, afficher un exemple de structure
+    # Mode debug
     if DEBUG and nodes:
         logger.info("🔍 Structure du premier article trouvé:")
         first_node = nodes[0]
         html_preview = html.tostring(first_node, encoding='unicode', method='html')[:500]
         logger.info(html_preview)
         
-        # Afficher tous les liens trouvés
         all_links = first_node.xpath('.//a/@href')
         logger.info(f"🔗 Liens trouvés dans le premier article: {all_links[:5]}")
         
-        # Afficher tous les titres possibles
         all_titles = first_node.xpath('.//h1/text() | .//h2/text() | .//h3/text() | .//h4/text()')
         logger.info(f"📝 Titres trouvés: {all_titles[:5]}")
-
+    
     logger.info(f"📌 Nombre d'articles détectés : {len(nodes)}")
-
+    
     for node in nodes:
         if len(articles) >= MAX_ARTICLES:
             break
+        
         try:
-            # === TITRE - Stratégies multiples ===
+            # === TITRE ===
             title = ""
-            
-            # Essayer différents sélecteurs de titre
             title_selectors = [
                 './/h1/a/text()',
                 './/h2/a/text()',
@@ -216,19 +276,16 @@ def scrape_legit_ng() -> List[dict]:
                     title_elem = node.xpath(selector)
                     if title_elem:
                         title = " ".join([t.strip() for t in title_elem if t.strip()]).strip()
-                        if title:
+                        if title and len(title) >= 3:
                             break
-                except:
+                except Exception:
                     continue
             
-            # Si pas de titre, passer
             if not title or len(title) < 3:
                 continue
-
-            # === URL - Stratégies multiples ===
-            url = ""
             
-            # Essayer de trouver l'URL du lien principal
+            # === URL ===
+            url = ""
             url_selectors = [
                 './/h1/a/@href',
                 './/h2/a/@href',
@@ -251,34 +308,24 @@ def scrape_legit_ng() -> List[dict]:
                 try:
                     url_elem = node.xpath(selector)
                     if url_elem and url_elem[0].strip():
-                        url = url_elem[0].strip()
-                        # Filtrer les URLs non-articles
-                        if any(skip in url for skip in ['#', 'javascript:', 'mailto:', 'tel:', '/search', '/category']):
-                            url = ""
-                            continue
+                        url = normalize_url(url_elem[0].strip())
                         if url:
                             break
-                except:
+                except Exception:
                     continue
             
             if not url:
                 continue
-                
-            # Normaliser l'URL
-            if url.startswith('/'):
-                url = 'https://www.legit.ng' + url
-            elif not url.startswith('http'):
-                continue
-
+            
             # Vérifier le cache
             if url in cache_urls:
                 logger.debug(f"⏭️ Article déjà scrapé: {url}")
                 continue
-
+            
             # Anti-doublon
             if any(a['url'] == url for a in articles):
                 continue
-
+            
             # === IMAGE ===
             image = ""
             img_selectors = [
@@ -302,10 +349,11 @@ def scrape_legit_ng() -> List[dict]:
                                 src = 'https://www.legit.ng' + src
                             image = src
                             break
-                except:
+                except Exception:
                     continue
-
+            
             # === DESCRIPTION ===
+            description = ""
             desc_selectors = [
                 './/p[contains(@class, "description")]/text()',
                 './/p[contains(@class, "excerpt")]/text()',
@@ -315,7 +363,6 @@ def scrape_legit_ng() -> List[dict]:
                 './/p/text()'
             ]
             
-            description = ""
             for selector in desc_selectors:
                 try:
                     desc_elem = node.xpath(selector)
@@ -324,13 +371,14 @@ def scrape_legit_ng() -> List[dict]:
                         if desc and len(desc) > 10:
                             description = desc
                             break
-                except:
+                except Exception:
                     continue
             
             if not description:
                 description = title
-
+            
             # === DATE ===
+            date_str = ""
             date_selectors = [
                 './/time/@datetime',
                 './/time/text()',
@@ -340,7 +388,6 @@ def scrape_legit_ng() -> List[dict]:
                 './/span[contains(@class, "published")]/text()'
             ]
             
-            date_str = ""
             for selector in date_selectors:
                 try:
                     date_elem = node.xpath(selector)
@@ -348,16 +395,16 @@ def scrape_legit_ng() -> List[dict]:
                         date_str = date_elem[0].strip()
                         if date_str:
                             break
-                except:
+                except Exception:
                     continue
             
             date_obj = clean_date(date_str)
-
+            
             # === TRADUCTION ===
             logger.info(f"🌐 Traduction de: {title[:30]}...")
             title_fr = translate_text(title)
             description_fr = translate_text(description)
-
+            
             article = {
                 'title': title,
                 'title_fr': title_fr,
@@ -368,46 +415,30 @@ def scrape_legit_ng() -> List[dict]:
                 'date': date_obj,
                 'date_str': date_obj.isoformat() if date_obj else ""
             }
-
+            
             articles.append(article)
             new_urls.append(url)
-
             logger.info(f"✨ Article ajouté: {title_fr[:40]}...")
+            
+            # Délai aléatoire pour respecter le site
             time.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
-
+        
         except Exception as e:
             logger.debug(f"Erreur sur un article : {e}")
             continue
-
+    
     # Mettre à jour le cache
     if new_urls:
         all_urls = cache_urls + new_urls
         if len(all_urls) > 500:
             all_urls = all_urls[-500:]
         save_cache(all_urls)
-
+    
     return articles
 
 # -------------------- GÉNÉRATION DU FEED RSS --------------------
 def generate_feed(articles: List[dict], output_file: str = FEED_FILE):
     """Génère un fichier feed.xml à partir des articles."""
-    if not articles:
-        logger.warning("Aucun article à mettre dans le feed")
-        # Créer un feed minimal pour éviter les erreurs
-        fg = FeedGenerator()
-        fg.title("Legit.ng - Actualités traduites en français")
-        fg.description("Aucun article disponible actuellement")
-        fg.link(href="https://buzzplus225.github.io/legitoi.github.io/", rel="alternate")
-        fg.link(href="https://buzzplus225.github.io/legitoi.github.io/feed.xml", rel="self")
-        fg.language("fr")
-        fg.lastBuildDate(datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"))
-        
-        rss_str = fg.rss_str(pretty=True)
-        with open(output_file, 'wb') as f:
-            f.write(rss_str)
-        logger.info(f"✅ Feed RSS vide créé: {output_file}")
-        return
-
     fg = FeedGenerator()
     fg.title("Legit.ng - Actualités traduites en français")
     fg.description("Flux RSS des actualités de Legit.ng automatiquement traduites en français")
@@ -415,25 +446,30 @@ def generate_feed(articles: List[dict], output_file: str = FEED_FILE):
     fg.link(href="https://buzzplus225.github.io/legitoi.github.io/feed.xml", rel="self")
     fg.language("fr")
     fg.lastBuildDate(datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"))
-    fg.generator("Scraper Traducteur Legit.ng v2.0")
-
-    for article in articles[:20]:
-        fe = fg.add_entry()
-        fe.title(article.get('title_fr', article.get('title', '')))
-        fe.link(href=article['url'])
-        fe.guid(article['url'], permalink=True)
-        fe.description(article.get('description_fr', article.get('description', '')))
-        
-        content = f"<p>{article.get('description_fr', article.get('description', ''))}</p>"
-        if article.get('image'):
-            content = f'<img src="{article["image"]}" alt="{article.get("title", "")}" style="max-width:100%;"/><br/>{content}'
-        fe.content(content, type="CDATA")
-        
-        if article.get('date'):
-            fe.pubDate(article['date'].strftime("%a, %d %b %Y %H:%M:%S +0000"))
-        else:
-            fe.pubDate(datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"))
-
+    fg.generator("Scraper Traducteur Legit.ng v2.1")
+    
+    if not articles:
+        logger.warning("Aucun article à mettre dans le feed")
+        fg.description("Aucun article disponible actuellement")
+    else:
+        for article in articles[:20]:
+            fe = fg.add_entry()
+            fe.title(article.get('title_fr', article.get('title', '')))
+            fe.link(href=article['url'])
+            fe.guid(article['url'], permalink=True)
+            fe.description(article.get('description_fr', article.get('description', '')))
+            
+            content = f"<p>{article.get('description_fr', article.get('description', ''))}</p>"
+            if article.get('image'):
+                content = f'<img src="{article["image"]}" alt="{article.get("title", "")}" style="max-width:100%;"/><br/>{content}'
+            
+            fe.content(content, type="CDATA")
+            
+            if article.get('date'):
+                fe.pubDate(article['date'].strftime("%a, %d %b %Y %H:%M:%S +0000"))
+            else:
+                fe.pubDate(datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"))
+    
     rss_str = fg.rss_str(pretty=True)
     with open(output_file, 'wb') as f:
         f.write(rss_str)
@@ -441,7 +477,7 @@ def generate_feed(articles: List[dict], output_file: str = FEED_FILE):
     logger.info(f"✅ Feed RSS généré: {output_file} ({len(articles)} articles)")
 
 # -------------------- SAUVEGARDE JSON --------------------
-def save_json(articles: List[dict], output_file: str = "articles.json"):
+def save_json(articles: List[dict], output_file: str = JSON_FILE):
     """Sauvegarde les articles en JSON pour débogage."""
     try:
         articles_serializable = []
@@ -453,6 +489,7 @@ def save_json(articles: List[dict], output_file: str = "articles.json"):
         
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(articles_serializable, f, ensure_ascii=False, indent=2)
+        
         logger.info(f"✅ JSON sauvegardé: {output_file}")
     except Exception as e:
         logger.error(f"Erreur de sauvegarde JSON: {e}")
@@ -463,8 +500,8 @@ if __name__ == "__main__":
     start_time = time.time()
     
     articles = scrape_legit_ng()
-    
     elapsed = time.time() - start_time
+    
     print(f"✅ Scraping terminé. {len(articles)} articles récupérés en {elapsed:.2f}s")
     
     if articles:
@@ -472,10 +509,8 @@ if __name__ == "__main__":
         save_json(articles)
         print(f"✅ Fichiers générés:")
         print(f"   - {FEED_FILE}")
-        print(f"   - articles.json")
+        print(f"   - {JSON_FILE}")
     else:
         print("❌ Aucun article trouvé")
-        # Créer un feed vide
-        generate_feed([], "feed.xml")
-        # Ne pas exit en erreur, créer un feed vide
+        generate_feed([], FEED_FILE)
         print("⚠️ Feed vide créé")
