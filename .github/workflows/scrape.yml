@@ -12,19 +12,15 @@ env:
   PYTHON_VERSION: '3.10'
   PIP_NO_INPUT: 1
   PIP_DEFAULT_TIMEOUT: 100
-  # Forcer Node.js 24 pour éviter les avertissements de dépréciation
-  ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node24
 
 jobs:
   scrape-and-translate:
     name: Scrape, traduit et publie le flux RSS
     runs-on: ubuntu-latest
-    
     permissions:
       contents: write
       pages: write
       id-token: write
-
     timeout-minutes: 15
 
     steps:
@@ -66,7 +62,7 @@ jobs:
             pip install -r requirements.txt
           else
             echo "⚠️ requirements.txt non trouvé, installation minimale"
-            pip install requests lxml feedgen deep-translator cloudscraper beautifulsoup4 python-dateutil
+            pip install requests lxml feedgen deep-translator cloudscraper
           fi
           echo "✅ Dépendances installées"
           pip list | grep -E "requests|lxml|feedgen|deep-translator|cloudscraper"
@@ -80,33 +76,45 @@ jobs:
           echo "🚀 Début du scraping: $(date)"
           python scraper_traducteur.py
           echo "✅ Fin du scraping: $(date)"
-          
+
           # Vérifications détaillées
           if [ ! -f "feed.xml" ]; then
             echo "❌ feed.xml non créé"
             exit 1
           fi
-          
           if [ ! -s "feed.xml" ]; then
             echo "❌ feed.xml existe mais est vide"
             exit 1
           fi
-          
+
           # Compter le nombre d'articles dans le feed
           ARTICLE_COUNT=$(grep -c "<item>" feed.xml || echo "0")
           echo "📄 Nombre d'articles dans le feed: $ARTICLE_COUNT"
           echo "article_count=$ARTICLE_COUNT" >> $GITHUB_OUTPUT
-          
           echo "✅ feed.xml généré avec succès"
           echo "📊 Taille: $(wc -c < feed.xml) octets"
           echo "📄 Lignes: $(wc -l < feed.xml)"
-          
+
           # Afficher un aperçu
           echo "📝 Aperçu des 5 premiers articles:"
           grep -E "<title>|<link>" feed.xml | head -10 || true
 
       # ============================================================
-      # ÉTAPE 6: SAUVEGARDE DES FICHIERS GÉNÉRÉS (Artifacts)
+      # ÉTAPE 6: VALIDATION XML
+      # ============================================================
+      - name: Validation du fichier XML
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libxml2-utils
+          if xmllint --noout feed.xml; then
+            echo "✅ XML valide"
+          else
+            echo "❌ XML invalide"
+            exit 1
+          fi
+
+      # ============================================================
+      # ÉTAPE 7: SAUVEGARDE DES FICHIERS GÉNÉRÉS (Artifacts)
       # ============================================================
       - name: Sauvegarde des fichiers générés
         if: always()
@@ -120,64 +128,151 @@ jobs:
           retention-days: 7
 
       # ============================================================
-      # ÉTAPE 7: COMMIT ET PUSH VERS MAIN
+      # ÉTAPE 8: COMMIT ET PUSH VERS MAIN
       # ============================================================
       - name: Commit et push vers main
         if: steps.scraping.outputs.article_count != '0'
         run: |
           git add feed.xml articles_cache.json 2>/dev/null || git add feed.xml
-          
           if git diff --staged --quiet; then
             echo "✅ Aucun changement détecté dans les fichiers"
           else
             echo "📝 Changements détectés, sauvegarde en cours..."
             git commit -m "🔄 Mise à jour RSS - $(date '+%Y-%m-%d %H:%M') - ${{ steps.scraping.outputs.article_count }} articles"
-            
+
             # Boucle robuste de rebase / push avec délais progressifs
             MAX_RETRIES=5
             for i in $(seq 1 $MAX_RETRIES); do
               echo "🔄 Tentative $i/$MAX_RETRIES..."
-              
-              # Récupérer les derniers changements et rebaser
               git fetch origin main
-              git rebase origin/main
-              
+              git rebase origin/main || git rebase --abort
               if git push origin main; then
                 echo "✅ Push effectué avec succès"
                 break
               fi
-              
               if [ $i -eq $MAX_RETRIES ]; then
                 echo "❌ Échec après $MAX_RETRIES tentatives"
                 exit 1
               fi
-              
               echo "⚠️ Échec du push, nouvelle tentative dans $((i*2)) secondes..."
               sleep $((i*2))
             done
           fi
 
       # ============================================================
-      # ÉTAPE 8: PUBLICATION SUR GITHUB PAGES
+      # ÉTAPE 9: PRÉPARATION DU SITE (dossier public/)
+      # ============================================================
+      - name: Préparation du site pour GitHub Pages
+        run: |
+          # Créer un dossier public/ isolé (ne publie QUE le site)
+          rm -rf public
+          mkdir -p public
+
+          # Copier le feed RSS
+          cp feed.xml public/
+
+          # Créer un index.html minimal et élégant
+          cat > public/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Legit.ng - Actualités traduites en français</title>
+            <link rel="alternate" type="application/rss+xml" title="Flux RSS" href="feed.xml">
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                max-width: 800px;
+                margin: 50px auto;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+              }
+              .card {
+                background: rgba(255, 255, 255, 0.95);
+                color: #333;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+              }
+              h1 { color: #667eea; margin-top: 0; }
+              a {
+                display: inline-block;
+                background: #667eea;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: bold;
+                transition: transform 0.2s;
+              }
+              a:hover { transform: translateY(-2px); }
+              .info { margin-top: 30px; font-size: 0.9em; color: #666; }
+              code {
+                background: #f4f4f4;
+                padding: 2px 8px;
+                border-radius: 4px;
+                font-size: 0.9em;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>📰 Legit.ng en français</h1>
+              <p>Flux RSS des actualités de <strong>Legit.ng</strong> automatiquement traduites en français.</p>
+              <p>
+                <a href="feed.xml">📡 Télécharger le flux RSS</a>
+              </p>
+              <div class="info">
+                <p><strong>🔗 URL du flux :</strong></p>
+                <p><code>FEED_URL_PLACEHOLDER</code></p>
+                <p><strong>⏰ Mise à jour :</strong> Toutes les 4 heures</p>
+                <p><strong>📅 Dernière mise à jour :</strong> TIMESTAMP_PLACEHOLDER</p>
+              </div>
+            </div>
+          </body>
+          </html>
+          EOF
+
+          # Remplacer les placeholders par les vraies valeurs
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          FEED_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/feed.xml"
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
+
+          sed -i "s|FEED_URL_PLACEHOLDER|${FEED_URL}|g" public/index.html
+          sed -i "s|TIMESTAMP_PLACEHOLDER|${TIMESTAMP}|g" public/index.html
+
+          echo "✅ Dossier public/ préparé"
+          ls -la public/
+
+      # ============================================================
+      # ÉTAPE 10: PUBLICATION SUR GITHUB PAGES
       # ============================================================
       - name: Publication sur GitHub Pages
+        if: success()
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
+          publish_dir: ./public
           publish_branch: gh-pages
           commit_message: "🔄 Déploiement CDN Pages - ${GITHUB_RUN_ID}"
-          force_orphan: true
+          force_orphan: false
           keep_files: false
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
 
       # ============================================================
-      # ÉTAPE 9: RÉSUMÉ DANS L'INTERFACE GITHUB
+      # ÉTAPE 11: RÉSUMÉ DANS L'INTERFACE GITHUB
       # ============================================================
       - name: Résumé de l'exécution
         if: always()
         run: |
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          FEED_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/feed.xml"
+          SITE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/"
+
           echo "### 📊 Résumé du scraping" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Métrique | Valeur |" >> $GITHUB_STEP_SUMMARY
@@ -186,8 +281,9 @@ jobs:
           echo "| ✅ Statut | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 📄 Articles | ${{ steps.scraping.outputs.article_count || '0' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 📁 Fichier | feed.xml |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔗 URL | https://buzzplus225.github.io/legitoi.github.io/feed.xml |" >> $GITHUB_STEP_SUMMARY
-          
+          echo "| 🔗 Flux RSS | [${FEED_URL}](${FEED_URL}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 Site | [${SITE_URL}](${SITE_URL}) |" >> $GITHUB_STEP_SUMMARY
+
           if [ -f "feed.xml" ] && [ -s "feed.xml" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 📝 Extrait du flux généré" >> $GITHUB_STEP_SUMMARY
@@ -197,7 +293,7 @@ jobs:
           fi
 
       # ============================================================
-      # ÉTAPE 10: NOTIFICATION EN CAS D'ÉCHEC
+      # ÉTAPE 12: NOTIFICATION EN CAS D'ÉCHEC
       # ============================================================
       - name: Notification d'échec
         if: failure()
@@ -211,4 +307,4 @@ jobs:
           echo "- Changement de structure HTML" >> $GITHUB_STEP_SUMMARY
           echo "- Problème de réseau ou de timeout" >> $GITHUB_STEP_SUMMARY
           echo "- Erreur dans le script Python" >> $GITHUB_STEP_SUMMARY
-          exit 1
+          echo "- Blocage de Google Translate (rate limit)" >> $GITHUB_STEP_SUMMARY
